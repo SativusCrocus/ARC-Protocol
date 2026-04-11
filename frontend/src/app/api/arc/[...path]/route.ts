@@ -1,4 +1,11 @@
-const BACKEND = process.env.BACKEND_URL || "http://localhost:8000";
+function getBackendUrl(): string {
+  if (process.env.BACKEND_URL) return process.env.BACKEND_URL;
+  if (process.env.VERCEL_URL)
+    return `https://${process.env.VERCEL_URL}/_/backend`;
+  return "http://localhost:8000";
+}
+
+const BACKEND = getBackendUrl();
 
 export async function GET(
   request: Request,
