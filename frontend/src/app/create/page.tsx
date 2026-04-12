@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,15 +9,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { motion, AnimatePresence } from "framer-motion";
+import { FileCode, CheckCircle } from "lucide-react";
 import type { CreateResult } from "@/lib/types";
+
+function hashPreview(text: string): string {
+  if (!text) return "\u2014";
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = ((h << 5) - h + text.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(16).padStart(8, "0") + "...";
+}
 
 export default function CreatePage() {
   return (
-    <div className="max-w-2xl space-y-8">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Create Record</h2>
-        <p className="text-zinc-400 mt-1">
-          Inscribe a new ARC record on the provenance chain
+        <h2 className="text-2xl font-bold tracking-tighter">
+          <span className="text-[#F7931A]">Inscribe</span>{" "}
+          <span className="text-white/90">Record</span>
+        </h2>
+        <p className="text-white/25 text-sm mt-1">
+          Sign and commit to the provenance chain
         </p>
       </div>
       <Tabs defaultValue="genesis">
@@ -32,7 +50,7 @@ export default function CreatePage() {
           <ActionForm />
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }
 
@@ -45,7 +63,11 @@ function GenesisForm() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.genesis({ alias: alias || undefined, action, input_data: "genesis" }),
+      api.genesis({
+        alias: alias || undefined,
+        action,
+        input_data: "genesis",
+      }),
     onSuccess: (data) => {
       setResult(data);
       setError("");
@@ -55,48 +77,116 @@ function GenesisForm() {
   });
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle>New Genesis Record</CardTitle>
-        <p className="text-sm text-zinc-400">
-          Create the first record in a new agent&apos;s provenance chain
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Agent Alias (optional)</Label>
-          <Input
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-            placeholder="my-agent"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Action Description</Label>
-          <Textarea
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-            placeholder="Agent initialized for market analysis..."
-            rows={3}
-          />
-        </div>
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={!action || mutation.isPending}
-          className="w-full"
-        >
-          {mutation.isPending ? "Creating..." : "Create Genesis"}
-        </Button>
-
-        {error && (
-          <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+      {/* Left: Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">New Genesis Record</CardTitle>
+          <p className="text-xs text-white/25">
+            First record in an agent&apos;s provenance chain
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Agent Alias</Label>
+            <Input
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              placeholder="my-agent"
+            />
           </div>
-        )}
+          <div className="space-y-2">
+            <Label>Action Description</Label>
+            <Textarea
+              value={action}
+              onChange={(e) => setAction(e.target.value)}
+              placeholder="Agent initialized for market analysis..."
+              rows={4}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-white/20 font-mono">
+            <span>ihash preview:</span>
+            <span className="text-[#F7931A]/60">{hashPreview(action)}</span>
+          </div>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!action || mutation.isPending}
+            className="w-full"
+          >
+            {mutation.isPending ? "Signing..." : "Create Genesis"}
+          </Button>
+          {error && (
+            <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {result && <ResultPanel result={result} />}
-      </CardContent>
-    </Card>
+      {/* Right: Preview */}
+      <Card className="glass-active">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileCode className="h-4 w-4 text-[#00F0FF]/60" />
+            <CardTitle className="text-base">Inscription Preview</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <AnimatePresence mode="wait">
+            {result ? (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                  <CheckCircle className="h-4 w-4" />
+                  Record inscribed
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/25 mb-1">Record ID</p>
+                  <p className="text-xs font-mono text-white/60 select-all break-all">
+                    {result.id}
+                  </p>
+                </div>
+                <pre className="text-[11px] font-mono text-white/30 overflow-auto max-h-80 p-3 bg-black/50 rounded-lg border border-white/[0.04]">
+                  {JSON.stringify(result.record, null, 2)}
+                </pre>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <pre className="text-[11px] font-mono text-white/20 overflow-auto max-h-80 p-3 bg-black/30 rounded-lg border border-white/[0.03]">
+                  {JSON.stringify(
+                    {
+                      arc: "1.0",
+                      type: "genesis",
+                      agent: {
+                        pubkey: "<your-taproot-key>",
+                        alias: alias || undefined,
+                      },
+                      prev: null,
+                      memrefs: [],
+                      ts: new Date().toISOString(),
+                      ihash: `sha256(${action.slice(0, 20) || "..."})`,
+                      ohash: "...",
+                      action: action || "...",
+                      sig: "<bip340-schnorr>",
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -130,104 +220,148 @@ function ActionForm() {
     onError: (e) => setError(e.message),
   });
 
-  return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle>New Action Record</CardTitle>
-        <p className="text-sm text-zinc-400">
-          Extend an existing chain with a new signed action
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Previous Record ID</Label>
-          <Input
-            value={prev}
-            onChange={(e) => setPrev(e.target.value)}
-            placeholder="Paste the record ID to extend..."
-            className="font-mono text-xs"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Action Description</Label>
-          <Textarea
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-            placeholder="Analyzed BTC mempool congestion..."
-            rows={3}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>
-            Ollama Prompt{" "}
-            <span className="text-zinc-500 font-normal">(optional)</span>
-          </Label>
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Send to local LLM for ihash/ohash generation..."
-            rows={2}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>
-            Memory References{" "}
-            <span className="text-zinc-500 font-normal">
-              (comma-separated IDs)
-            </span>
-          </Label>
-          <Input
-            value={memrefs}
-            onChange={(e) => setMemrefs(e.target.value)}
-            placeholder="id1, id2, ..."
-            className="font-mono text-xs"
-          />
-        </div>
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={!prev || !action || mutation.isPending}
-          className="w-full"
-        >
-          {mutation.isPending ? "Creating..." : "Create Action"}
-        </Button>
-
-        {error && (
-          <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
-          </div>
-        )}
-
-        {result && <ResultPanel result={result} />}
-      </CardContent>
-    </Card>
+  const previewRecord = useMemo(
+    () => ({
+      arc: "1.0",
+      type: "action",
+      agent: { pubkey: "<your-taproot-key>" },
+      prev: prev || null,
+      memrefs: memrefs
+        ? memrefs
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
+      ts: new Date().toISOString(),
+      ihash: `sha256(${(prompt || action).slice(0, 16) || "..."})`,
+      ohash: "...",
+      action: action || "...",
+      sig: "<bip340-schnorr>",
+    }),
+    [prev, action, prompt, memrefs]
   );
-}
-
-function ResultPanel({ result }: { result: CreateResult }) {
-  const [showJson, setShowJson] = useState(false);
 
   return (
-    <div className="p-4 bg-zinc-900 rounded-lg border border-zinc-800 space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-green-500 font-medium">
-          Record created successfully
-        </p>
-        <button
-          onClick={() => setShowJson(!showJson)}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-        >
-          {showJson ? "Hide" : "Show"} JSON
-        </button>
-      </div>
-      <div className="space-y-1">
-        <p className="text-xs text-zinc-500">Record ID</p>
-        <p className="text-xs font-mono text-zinc-300 select-all">{result.id}</p>
-      </div>
-      {showJson && (
-        <pre className="text-xs font-mono text-zinc-400 overflow-auto max-h-64 p-3 bg-zinc-950 rounded">
-          {JSON.stringify(result.record, null, 2)}
-        </pre>
-      )}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+      {/* Left: Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">New Action Record</CardTitle>
+          <p className="text-xs text-white/25">
+            Extend a chain with a signed action
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Previous Record ID</Label>
+            <Input
+              value={prev}
+              onChange={(e) => setPrev(e.target.value)}
+              placeholder="Paste the record ID to extend..."
+              className="font-mono text-xs"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Action Description</Label>
+            <Textarea
+              value={action}
+              onChange={(e) => setAction(e.target.value)}
+              placeholder="Analyzed BTC mempool congestion..."
+              rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>
+              Ollama Prompt{" "}
+              <span className="text-white/15 font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Send to local LLM for ihash/ohash..."
+              rows={2}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>
+              Memory References{" "}
+              <span className="text-white/15 font-normal">
+                (comma-separated)
+              </span>
+            </Label>
+            <Input
+              value={memrefs}
+              onChange={(e) => setMemrefs(e.target.value)}
+              placeholder="id1, id2, ..."
+              className="font-mono text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-white/20 font-mono">
+            <span>ihash:</span>
+            <span className="text-[#00F0FF]/50">
+              {hashPreview(prompt || action)}
+            </span>
+          </div>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={!prev || !action || mutation.isPending}
+            className="w-full"
+          >
+            {mutation.isPending ? "Signing..." : "Create Action"}
+          </Button>
+          {error && (
+            <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Right: Preview */}
+      <Card className="glass-active">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileCode className="h-4 w-4 text-[#00F0FF]/60" />
+            <CardTitle className="text-base">Inscription Preview</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <AnimatePresence mode="wait">
+            {result ? (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                  <CheckCircle className="h-4 w-4" />
+                  Record inscribed
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/25 mb-1">Record ID</p>
+                  <p className="text-xs font-mono text-white/60 select-all break-all">
+                    {result.id}
+                  </p>
+                </div>
+                <pre className="text-[11px] font-mono text-white/30 overflow-auto max-h-80 p-3 bg-black/50 rounded-lg border border-white/[0.04]">
+                  {JSON.stringify(result.record, null, 2)}
+                </pre>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <pre className="text-[11px] font-mono text-white/20 overflow-auto max-h-80 p-3 bg-black/30 rounded-lg border border-white/[0.03]">
+                  {JSON.stringify(previewRecord, null, 2)}
+                </pre>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -3,64 +3,69 @@
 import Link from "next/link";
 import type { ARCRecord } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Zap } from "lucide-react";
 
-const typeStyles: Record<string, string> = {
-  genesis: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  action: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  settlement: "bg-green-500/10 text-green-500 border-green-500/20",
+const typeStyles: Record<string, { badge: string; dot: string }> = {
+  genesis: {
+    badge: "bg-[#F7931A]/10 text-[#F7931A] border-[#F7931A]/20",
+    dot: "bg-[#F7931A]",
+  },
+  action: {
+    badge: "bg-[#00F0FF]/10 text-[#00F0FF] border-[#00F0FF]/20",
+    dot: "bg-[#00F0FF]",
+  },
+  settlement: {
+    badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    dot: "bg-emerald-400",
+  },
 };
 
 export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
+  const style = typeStyles[record.type] || typeStyles.action;
+
   return (
     <Link href={`/explorer/${id}`}>
-      <Card className="hover:border-zinc-700 transition-colors cursor-pointer">
-        <CardContent className="p-4 flex items-center gap-4">
-          <Badge className={typeStyles[record.type] || ""}>
-            {record.type}
-          </Badge>
+      <div className="group relative rounded-lg border border-white/[0.04] bg-[#111111]/60 backdrop-blur-sm hover:border-white/[0.08] hover:bg-[#111111]/80 transition-all duration-200 cursor-pointer">
+        <div className="p-4 flex items-center gap-4">
+          {/* Type indicator dot */}
+          <div className="relative">
+            <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+            <div
+              className={`absolute inset-0 h-2 w-2 rounded-full ${style.dot} opacity-40 blur-sm`}
+            />
+          </div>
+
+          <Badge className={style.badge}>{record.type}</Badge>
+
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{record.action}</p>
-            <p className="text-xs text-zinc-500 font-mono mt-0.5">
+            <p className="text-sm font-medium text-white/80 truncate group-hover:text-white transition-colors">
+              {record.action}
+            </p>
+            <p className="text-[11px] text-white/20 font-mono mt-0.5">
               {id.slice(0, 24)}&hellip;
             </p>
           </div>
+
           <div className="text-right shrink-0">
-            <p className="text-xs text-zinc-500">
+            <p className="text-[11px] text-white/25">
               {new Date(record.ts).toLocaleDateString()}
             </p>
-            <p className="text-[11px] text-zinc-600">
+            <p className="text-[10px] text-white/15 font-mono">
               {new Date(record.ts).toLocaleTimeString()}
             </p>
           </div>
+
           {record.settlement && (
             <Badge
               variant="outline"
-              className="text-green-500 border-green-500/20 shrink-0"
+              className="text-emerald-400 border-emerald-500/20 shrink-0 gap-1"
             >
-              <Zap className="h-3 w-3 mr-1" />
-              {record.settlement.amount_sats} sats
+              <Zap className="h-3 w-3" />
+              {record.settlement.amount_sats.toLocaleString()} sats
             </Badge>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
-  );
-}
-
-function Zap({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-    </svg>
   );
 }

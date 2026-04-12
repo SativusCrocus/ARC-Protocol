@@ -28,8 +28,8 @@ unobsoletable – like TCP/IP, the value accrues to the network, not the impleme
                      └───────────┘
 ```
 
-- **Frontend**: Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, React Flow DAG visualizer
-- **Backend**: Python CLI (`arc.py`) + FastAPI REST API
+- **Frontend**: Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Framer Motion, React Flow DAG
+- **Backend**: Python CLI (`arc.py`) + FastAPI REST API with slowapi rate limiting
 - **Storage**: SQLite (local dev) → Bitcoin inscriptions (production)
 - **LLM**: Ollama (local, free) for prompt→hash generation
 - **Settlement**: Lightning Network via LND REST API
@@ -179,10 +179,44 @@ pytest tests/ -v
 
 ## Security
 
+See [SECURITY.md](SECURITY.md) for the full security policy.
+
 - **Private keys** are stored in `~/.arc/keys/` with `0600` permissions. Never expose them.
+- **Private keys never touch the API transport layer.** The API loads keys from disk for signing, never transmits them.
+- **Schnorr re-verification** on every record before storage (defense in depth).
+- **Rate limiting** via `slowapi` on all mutation endpoints.
+- **Strict Pydantic validation** with regex-enforced hex format checks on every request.
+- **Security headers**: CSP, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy.
 - **Mainnet warning**: This reference implementation defaults to regtest/local mode. Do not use mainnet keys for testing.
-- **No key transmission**: The API never transmits private keys over the network. Key generation returns the pubkey; the secret stays on disk.
-- **Signature verification**: Every record is cryptographically signed. Tampering with any field invalidates the chain.
+
+## Vercel Deployment
+
+ARC Protocol deploys as a multi-service Vercel project (frontend + backend):
+
+### Setup
+
+1. Push to GitHub and import in [Vercel Dashboard](https://vercel.com/dashboard)
+2. Vercel auto-detects the `vercel.json` multi-service config
+3. Set environment variables in Vercel project settings:
+   - `NEXT_PUBLIC_BITCOIN_NETWORK=regtest` (or `mainnet`)
+   - All environment variables should be set as **read-only** in Vercel
+
+### Recommended Vercel Settings
+
+- **Edge Config**: Enable for dynamic configuration without redeployment
+- **Vercel Protection (DDoS)**: Enable under Project Settings > Security
+- **Environment Variables**: Set all as read-only to prevent runtime modification
+- **Deployment Protection**: Enable Vercel Authentication for preview deployments
+
+### Post-Deploy Verification
+
+```bash
+# Health check
+curl https://your-app.vercel.app/_/backend/health
+
+# Frontend
+open https://your-app.vercel.app
+```
 
 ## Edge Cases
 

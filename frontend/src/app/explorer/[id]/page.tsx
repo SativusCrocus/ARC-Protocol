@@ -1,19 +1,28 @@
 "use client";
 
-import { use } from "react";
+import { use, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChainViewer } from "@/components/chain-viewer";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle, XCircle, Copy } from "lucide-react";
 
+const ChainViewer = dynamic(
+  () =>
+    import("@/components/chain-viewer").then((m) => ({
+      default: m.ChainViewer,
+    })),
+  { ssr: false }
+);
+
 const typeColors: Record<string, string> = {
-  genesis: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  action: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  settlement: "bg-green-500/10 text-green-500 border-green-500/20",
+  genesis: "bg-[#F7931A]/10 text-[#F7931A] border-[#F7931A]/20",
+  action: "bg-[#00F0FF]/10 text-[#00F0FF] border-[#00F0FF]/20",
+  settlement: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
 export default function RecordDetailPage({
@@ -45,8 +54,8 @@ export default function RecordDetailPage({
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-8 w-48 bg-zinc-900 rounded animate-pulse" />
-        <div className="h-64 bg-zinc-900 rounded-lg animate-pulse" />
+        <div className="h-8 w-48 rounded-lg skeleton-shimmer" />
+        <div className="h-64 rounded-xl skeleton-shimmer" />
       </div>
     );
   }
@@ -54,7 +63,7 @@ export default function RecordDetailPage({
   if (!data) {
     return (
       <Card>
-        <CardContent className="p-8 text-center text-zinc-500">
+        <CardContent className="p-8 text-center text-white/25">
           Record not found.
         </CardContent>
       </Card>
@@ -64,28 +73,30 @@ export default function RecordDetailPage({
   const { record } = data;
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Link
             href="/explorer"
-            className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 mb-2"
+            className="text-xs text-white/25 hover:text-white/50 flex items-center gap-1 mb-3 transition-colors"
           >
             <ArrowLeft className="h-3 w-3" /> Explorer
           </Link>
-          <h2 className="text-xl font-bold tracking-tight truncate">
+          <h2 className="text-xl font-bold tracking-tight truncate text-white/90">
             {record.action}
           </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              onClick={() => navigator.clipboard.writeText(id)}
-              className="text-xs font-mono text-zinc-500 hover:text-zinc-300 flex items-center gap-1"
-            >
-              {id.slice(0, 32)}&hellip;
-              <Copy className="h-3 w-3" />
-            </button>
-          </div>
+          <button
+            onClick={() => navigator.clipboard.writeText(id)}
+            className="text-[11px] font-mono text-white/20 hover:text-white/40 flex items-center gap-1.5 mt-1.5 transition-colors"
+          >
+            {id.slice(0, 32)}&hellip;
+            <Copy className="h-3 w-3" />
+          </button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Badge className={typeColors[record.type]}>{record.type}</Badge>
@@ -96,11 +107,11 @@ export default function RecordDetailPage({
             disabled={validation.isPending}
           >
             {validation.isPending
-              ? "Validating..."
+              ? "..."
               : validation.data
                 ? validation.data.valid
-                  ? "Valid"
-                  : "Invalid"
+                  ? "\u2713 Valid"
+                  : "\u2717 Invalid"
                 : "Validate"}
           </Button>
         </div>
@@ -108,56 +119,64 @@ export default function RecordDetailPage({
 
       {/* Validation Result */}
       {validation.data && (
-        <Card
-          className={
-            validation.data.valid
-              ? "border-green-500/30"
-              : "border-red-500/30"
-          }
-        >
-          <CardContent className="p-4 flex items-start gap-3">
-            {validation.data.valid ? (
-              <>
-                <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm text-green-500 font-medium">
-                    Valid &ndash; full chain verified
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    All signatures, timestamps, and references checked
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm text-red-500 font-medium mb-1">
-                    Validation failed
-                  </p>
-                  {validation.data.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-red-400">
-                      &bull; {e}
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+          <Card
+            className={
+              validation.data.valid
+                ? "border-emerald-500/20"
+                : "border-red-500/20"
+            }
+          >
+            <CardContent className="p-4 flex items-start gap-3">
+              {validation.data.valid ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-emerald-400 font-medium">
+                      Valid &ndash; full chain verified
                     </p>
-                  ))}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                    <p className="text-xs text-white/25 mt-1">
+                      All signatures, timestamps, and references checked
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-red-400 font-medium mb-1">
+                      Validation failed
+                    </p>
+                    {validation.data.errors.map((e, i) => (
+                      <p key={i} className="text-xs text-red-400/70">
+                        &bull; {e}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       )}
 
       {/* Chain Viewer */}
       {chain && chain.length > 1 && (
-        <div className="h-[250px] border border-zinc-800 rounded-lg overflow-hidden">
-          <ChainViewer records={chain} />
+        <div className="h-[280px] border border-white/[0.04] rounded-xl overflow-hidden">
+          <Suspense
+            fallback={<div className="h-full skeleton-shimmer rounded-xl" />}
+          >
+            <ChainViewer records={chain} />
+          </Suspense>
         </div>
       )}
 
       {/* Record Details */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Record Details</CardTitle>
+          <CardTitle className="text-sm uppercase tracking-wider text-white/40 font-medium">
+            Record Details
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
@@ -172,31 +191,28 @@ export default function RecordDetailPage({
               mono
               truncate
             />
-            <Field
-              label="Alias"
-              value={record.agent.alias || "\u2014"}
-            />
+            <Field label="Alias" value={record.agent.alias || "\u2014"} />
             <Field label="Input Hash" value={record.ihash} mono truncate />
             <Field label="Output Hash" value={record.ohash} mono truncate />
           </div>
 
-          {/* Prev */}
           {record.prev && (
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 mb-1">Previous Record</p>
+            <div className="mt-4 pt-4 border-t border-white/[0.04]">
+              <p className="text-[10px] text-white/25 mb-1 uppercase tracking-wider">
+                Previous Record
+              </p>
               <Link
                 href={`/explorer/${record.prev}`}
-                className="text-xs font-mono text-orange-500 hover:underline"
+                className="text-xs font-mono text-[#F7931A]/70 hover:text-[#F7931A] transition-colors"
               >
                 {record.prev}
               </Link>
             </div>
           )}
 
-          {/* Memrefs */}
           {record.memrefs.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 mb-1">
+            <div className="mt-4 pt-4 border-t border-white/[0.04]">
+              <p className="text-[10px] text-white/25 mb-1 uppercase tracking-wider">
                 Memory References ({record.memrefs.length})
               </p>
               <div className="space-y-1">
@@ -204,7 +220,7 @@ export default function RecordDetailPage({
                   <Link
                     key={m}
                     href={`/explorer/${m}`}
-                    className="block text-xs font-mono text-blue-500 hover:underline"
+                    className="block text-xs font-mono text-[#00F0FF]/60 hover:text-[#00F0FF] transition-colors"
                   >
                     {m}
                   </Link>
@@ -213,25 +229,24 @@ export default function RecordDetailPage({
             </div>
           )}
 
-          {/* Settlement */}
           {record.settlement && (
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
-                <p className="text-sm text-green-500 font-medium">
-                  Lightning Settlement: {record.settlement.amount_sats.toLocaleString()}{" "}
-                  sats
+            <div className="mt-4 pt-4 border-t border-white/[0.04]">
+              <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                <p className="text-sm text-emerald-400 font-medium">
+                  Lightning Settlement:{" "}
+                  {record.settlement.amount_sats.toLocaleString()} sats
                 </p>
                 <div className="mt-2 space-y-1">
-                  <p className="text-xs text-zinc-400">
-                    <span className="text-zinc-500">Payment Hash:</span>{" "}
+                  <p className="text-xs text-white/30">
+                    <span className="text-white/20">Payment Hash:</span>{" "}
                     <span className="font-mono">
                       {record.settlement.payment_hash}
                     </span>
                   </p>
                   {record.settlement.preimage && (
-                    <p className="text-xs text-zinc-400">
-                      <span className="text-zinc-500">Preimage:</span>{" "}
-                      <span className="font-mono text-orange-500">
+                    <p className="text-xs text-white/30">
+                      <span className="text-white/20">Preimage:</span>{" "}
+                      <span className="font-mono text-[#F7931A]/70">
                         {record.settlement.preimage}
                       </span>
                     </p>
@@ -241,10 +256,11 @@ export default function RecordDetailPage({
             </div>
           )}
 
-          {/* Signature */}
-          <div className="mt-4 pt-4 border-t border-zinc-800">
-            <p className="text-xs text-zinc-500 mb-1">Schnorr Signature</p>
-            <p className="text-xs font-mono text-zinc-400 break-all select-all">
+          <div className="mt-4 pt-4 border-t border-white/[0.04]">
+            <p className="text-[10px] text-white/25 mb-1 uppercase tracking-wider">
+              Schnorr Signature
+            </p>
+            <p className="text-[11px] font-mono text-white/20 break-all select-all">
               {record.sig}
             </p>
           </div>
@@ -255,18 +271,18 @@ export default function RecordDetailPage({
       {inscriptionData && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              Bitcoin Inscription Command
+            <CardTitle className="text-sm uppercase tracking-wider text-white/40 font-medium">
+              Bitcoin Inscription
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all bg-zinc-950 p-4 rounded-lg overflow-auto max-h-48">
+            <pre className="text-[11px] font-mono text-white/25 whitespace-pre-wrap break-all bg-black/50 p-4 rounded-lg overflow-auto max-h-48 border border-white/[0.03]">
               {inscriptionData.command}
             </pre>
           </CardContent>
         </Card>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -283,9 +299,11 @@ function Field({
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-zinc-500 mb-0.5">{label}</p>
+      <p className="text-[10px] text-white/25 mb-0.5 uppercase tracking-wider">
+        {label}
+      </p>
       <p
-        className={`text-sm ${mono ? "font-mono text-xs" : ""} ${
+        className={`text-sm ${mono ? "font-mono text-xs text-white/50" : "text-white/70"} ${
           truncate ? "truncate" : ""
         }`}
         title={truncate ? value : undefined}
