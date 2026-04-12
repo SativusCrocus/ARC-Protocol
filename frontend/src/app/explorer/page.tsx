@@ -8,11 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RecordCard } from "@/components/record-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Search, GitBranch } from "lucide-react";
 
 const ChainViewer = dynamic(
-  () => import("@/components/chain-viewer").then((m) => ({ default: m.ChainViewer })),
+  () =>
+    import("@/components/chain-viewer").then((m) => ({
+      default: m.ChainViewer,
+    })),
   { ssr: false }
 );
 
@@ -42,23 +45,19 @@ export default function ExplorerPage() {
   const displayRecords = chain || records;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <div className="space-y-6 anim-fade-up">
       <div>
-        <h2 className="text-2xl font-bold tracking-tighter">
+        <h2 className="text-[48px] font-bold tracking-tighter leading-none">
           <span className="text-[#00F0FF]">Memory</span>{" "}
           <span className="text-white/90">DAG</span>
         </h2>
-        <p className="text-white/25 text-sm mt-1">
+        <p className="text-white/25 text-sm mt-2">
           Search and visualize provenance chains
         </p>
       </div>
 
       {/* Search */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 anim-fade-up anim-delay-1">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
           <Input
@@ -85,29 +84,32 @@ export default function ExplorerPage() {
         )}
       </div>
 
-      {/* Chain Viewer */}
-      {chain && chain.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <GitBranch className="h-3.5 w-3.5 text-[#00F0FF]/50" />
-            <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
-              Chain Visualization
-            </h3>
-          </div>
-          <div className="h-[400px] border border-white/[0.04] rounded-xl overflow-hidden">
-            <Suspense
-              fallback={
-                <div className="h-full skeleton-shimmer rounded-xl" />
-              }
-            >
-              <ChainViewer records={chain} />
-            </Suspense>
-          </div>
-        </motion.div>
-      )}
+      {/* Full-screen Chain Viewer */}
+      <AnimatePresence>
+        {chain && chain.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <GitBranch className="h-3.5 w-3.5 text-[#00F0FF]/50" />
+              <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
+                Chain Visualization
+              </h3>
+            </div>
+            <div className="h-[450px] border border-white/[0.04] rounded-xl overflow-hidden">
+              <Suspense
+                fallback={
+                  <div className="h-full skeleton-shimmer rounded-xl" />
+                }
+              >
+                <ChainViewer records={chain} />
+              </Suspense>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {chainLoading && (
         <Card>
@@ -131,9 +133,7 @@ export default function ExplorerPage() {
       {/* Records List */}
       <div>
         <h3 className="text-xs font-medium text-white/30 mb-3 uppercase tracking-wider">
-          {query
-            ? `Results for ${query.slice(0, 16)}...`
-            : "All Records"}
+          {query ? `Results for ${query.slice(0, 16)}...` : "All Records"}
           {displayRecords && (
             <span className="text-white/15 ml-2">
               ({displayRecords.length})
@@ -141,15 +141,8 @@ export default function ExplorerPage() {
           )}
         </h3>
         <div className="space-y-2">
-          {displayRecords?.map(({ id, record }, i) => (
-            <motion.div
-              key={id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.015 }}
-            >
-              <RecordCard id={id} record={record} />
-            </motion.div>
+          {displayRecords?.map(({ id, record }) => (
+            <RecordCard key={id} id={id} record={record} />
           ))}
           {!displayRecords?.length && !chainLoading && !query && (
             <Card>
@@ -160,6 +153,6 @@ export default function ExplorerPage() {
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

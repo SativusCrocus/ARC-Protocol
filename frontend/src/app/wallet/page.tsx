@@ -57,17 +57,13 @@ export default function WalletPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl space-y-6"
-    >
+    <div className="max-w-2xl space-y-6 anim-fade-up">
       <div>
-        <h2 className="text-2xl font-bold tracking-tighter">
+        <h2 className="text-[48px] font-bold tracking-tighter leading-none">
           <span className="text-[#F7931A]">Taproot</span>{" "}
           <span className="text-white/90">Keys</span>
         </h2>
-        <p className="text-white/25 text-sm mt-1">
+        <p className="text-white/25 text-sm mt-2">
           BIP-340 Schnorr keypair management
         </p>
       </div>
@@ -106,8 +102,9 @@ export default function WalletPage() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-white/[0.02] rounded-lg border border-white/[0.04] space-y-3"
+                className="p-4 bg-white/[0.02] rounded-lg border border-white/[0.04] space-y-3 relative"
               >
+                <div className="ripple absolute inset-0 rounded-lg pointer-events-none" />
                 <p className="text-sm text-emerald-400 font-medium">
                   Keypair generated
                 </p>
@@ -144,73 +141,72 @@ export default function WalletPage() {
           </div>
         ) : keys?.length ? (
           <div className="space-y-2">
-            {keys.map((k, i) => {
+            {keys.map((k) => {
               const stats = getAgentStats(k.pubkey);
               return (
-                <motion.div
+                <Card
                   key={k.pubkey}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  className="hover:border-white/[0.1] transition-all duration-200"
                 >
-                  <Card className="hover:border-white/[0.1] transition-all duration-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <p className="text-sm font-medium text-white/80">
-                              {k.name}
-                            </p>
-                            {stats.count > 0 && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5">
-                                {stats.count} records
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-mono text-white/25 truncate">
-                            {k.pubkey}
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <p className="text-sm font-medium text-white/80">
+                            {k.name}
                           </p>
                           {stats.count > 0 && (
-                            <div className="flex gap-4 mt-2">
-                              <p className="text-[11px] text-white/20">
-                                Chain:{" "}
-                                <span className="text-white/50">
-                                  {stats.count}
-                                </span>
-                              </p>
-                              {stats.sats > 0 && (
-                                <p className="text-[11px] text-white/20">
-                                  Settled:{" "}
-                                  <span className="text-emerald-400/70">
-                                    {stats.sats.toLocaleString()} sats
-                                  </span>
-                                </p>
-                              )}
-                            </div>
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5"
+                            >
+                              {stats.count} records
+                            </Badge>
                           )}
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyPubkey(k.pubkey)}
-                          className="gap-1.5"
-                        >
-                          {copied === k.pubkey ? (
-                            <>
-                              <Check className="h-3 w-3 text-emerald-400" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
+                        <p className="text-[11px] font-mono text-white/25 truncate">
+                          {k.pubkey}
+                        </p>
+                        {stats.count > 0 && (
+                          <div className="flex gap-4 mt-2">
+                            <p className="text-[11px] text-white/20">
+                              Chain:{" "}
+                              <span className="text-white/50">
+                                {stats.count}
+                              </span>
+                            </p>
+                            {stats.sats > 0 && (
+                              <p className="text-[11px] text-white/20">
+                                Settled:{" "}
+                                <span className="text-emerald-400/70">
+                                  {stats.sats.toLocaleString()} sats
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyPubkey(k.pubkey)}
+                        className="gap-1.5"
+                      >
+                        {copied === k.pubkey ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -240,6 +236,6 @@ export default function WalletPage() {
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }

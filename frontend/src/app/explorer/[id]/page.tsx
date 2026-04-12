@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, CheckCircle, XCircle, Copy } from "lucide-react";
 
 const ChainViewer = dynamic(
@@ -73,11 +73,7 @@ export default function RecordDetailPage({
   const { record } = data;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <div className="space-y-6 anim-fade-up">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -118,51 +114,56 @@ export default function RecordDetailPage({
       </div>
 
       {/* Validation Result */}
-      {validation.data && (
-        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-          <Card
-            className={
-              validation.data.valid
-                ? "border-emerald-500/20"
-                : "border-red-500/20"
-            }
+      <AnimatePresence>
+        {validation.data && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
           >
-            <CardContent className="p-4 flex items-start gap-3">
-              {validation.data.valid ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-emerald-400 font-medium">
-                      Valid &ndash; full chain verified
-                    </p>
-                    <p className="text-xs text-white/25 mt-1">
-                      All signatures, timestamps, and references checked
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-red-400 font-medium mb-1">
-                      Validation failed
-                    </p>
-                    {validation.data.errors.map((e, i) => (
-                      <p key={i} className="text-xs text-red-400/70">
-                        &bull; {e}
+            <Card
+              className={
+                validation.data.valid
+                  ? "border-emerald-500/20"
+                  : "border-red-500/20"
+              }
+            >
+              <CardContent className="p-4 flex items-start gap-3">
+                {validation.data.valid ? (
+                  <>
+                    <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-emerald-400 font-medium">
+                        Valid &ndash; full chain verified
                       </p>
-                    ))}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+                      <p className="text-xs text-white/25 mt-1">
+                        All signatures, timestamps, and references checked
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-red-400 font-medium mb-1">
+                        Validation failed
+                      </p>
+                      {validation.data.errors.map((e, i) => (
+                        <p key={i} className="text-xs text-red-400/70">
+                          &bull; {e}
+                        </p>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Chain Viewer */}
+      {/* Full-screen Chain Viewer */}
       {chain && chain.length > 1 && (
-        <div className="h-[280px] border border-white/[0.04] rounded-xl overflow-hidden">
+        <div className="h-[300px] border border-white/[0.04] rounded-xl overflow-hidden">
           <Suspense
             fallback={<div className="h-full skeleton-shimmer rounded-xl" />}
           >
@@ -267,7 +268,7 @@ export default function RecordDetailPage({
         </CardContent>
       </Card>
 
-      {/* Inscription Command */}
+      {/* Bitcoin Inscription Command */}
       {inscriptionData && (
         <Card>
           <CardHeader>
@@ -282,7 +283,7 @@ export default function RecordDetailPage({
           </CardContent>
         </Card>
       )}
-    </motion.div>
+    </div>
   );
 }
 

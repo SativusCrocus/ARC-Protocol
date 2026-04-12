@@ -24,17 +24,13 @@ function hashPreview(text: string): string {
 
 export default function CreatePage() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <div className="space-y-6 anim-fade-up">
       <div>
-        <h2 className="text-2xl font-bold tracking-tighter">
+        <h2 className="text-[48px] font-bold tracking-tighter leading-none">
           <span className="text-[#F7931A]">Inscribe</span>{" "}
           <span className="text-white/90">Record</span>
         </h2>
-        <p className="text-white/25 text-sm mt-1">
+        <p className="text-white/25 text-sm mt-2">
           Sign and commit to the provenance chain
         </p>
       </div>
@@ -50,7 +46,7 @@ export default function CreatePage() {
           <ActionForm />
         </TabsContent>
       </Tabs>
-    </motion.div>
+    </div>
   );
 }
 
@@ -63,11 +59,7 @@ function GenesisForm() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.genesis({
-        alias: alias || undefined,
-        action,
-        input_data: "genesis",
-      }),
+      api.genesis({ alias: alias || undefined, action, input_data: "genesis" }),
     onSuccess: (data) => {
       setResult(data);
       setError("");
@@ -123,7 +115,7 @@ function GenesisForm() {
         </CardContent>
       </Card>
 
-      {/* Right: Preview */}
+      {/* Right: Animated ord envelope preview */}
       <Card className="glass-active">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -138,11 +130,13 @@ function GenesisForm() {
                 key="result"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                className="space-y-3 relative"
               >
-                <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                  <CheckCircle className="h-4 w-4" />
-                  Record inscribed
+                <div className="relative ripple rounded-lg p-0.5">
+                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                    <CheckCircle className="h-4 w-4" />
+                    Record inscribed
+                  </div>
                 </div>
                 <div>
                   <p className="text-[10px] text-white/25 mb-1">Record ID</p>
@@ -317,7 +311,7 @@ function ActionForm() {
         </CardContent>
       </Card>
 
-      {/* Right: Preview */}
+      {/* Right: Live preview */}
       <Card className="glass-active">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -332,11 +326,13 @@ function ActionForm() {
                 key="result"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                className="space-y-3 relative"
               >
-                <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                  <CheckCircle className="h-4 w-4" />
-                  Record inscribed
+                <div className="relative ripple rounded-lg p-0.5">
+                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                    <CheckCircle className="h-4 w-4" />
+                    Record inscribed
+                  </div>
                 </div>
                 <div>
                   <p className="text-[10px] text-white/25 mb-1">Record ID</p>

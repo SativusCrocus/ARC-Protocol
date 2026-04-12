@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecordCard } from "@/components/record-card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   PlusCircle,
   Activity,
@@ -51,7 +51,6 @@ export default function Dashboard() {
     (r) => filter === "all" || r.record.type === filter
   );
 
-  // Top agents by chain length
   const agentRanking = records
     ? Object.values(
         records.reduce<
@@ -81,13 +80,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
+      <div className="flex items-center justify-between anim-fade-up">
         <div>
-          <h2 className="text-3xl lg:text-[42px] font-bold tracking-tighter leading-none">
+          <h2 className="text-[48px] font-bold tracking-tighter leading-none">
             <span className="text-[#F7931A]">ARC</span>{" "}
             <span className="text-white/90">Protocol</span>
           </h2>
@@ -101,83 +96,74 @@ export default function Dashboard() {
             Inscribe
           </Button>
         </Link>
-      </motion.div>
+      </div>
 
       {/* Bento Stats Grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
-      >
-        {[
-          {
-            label: "Records",
-            value: stats?.total ?? "\u2014",
-            icon: Database,
-            accent: "text-white",
-          },
-          {
-            label: "Agents",
-            value: stats?.agents ?? "\u2014",
-            icon: Users,
-            accent: "text-[#F7931A]",
-          },
-          {
-            label: "Actions",
-            value: stats?.actions ?? "\u2014",
-            icon: Activity,
-            accent: "text-[#00F0FF]",
-          },
-          {
-            label: "Settled",
-            value: stats?.totalSats
-              ? stats.totalSats.toLocaleString()
-              : "\u2014",
-            unit: stats?.totalSats ? "sats" : "",
-            icon: Zap,
-            accent: "text-emerald-400",
-          },
-        ].map(({ label, value, unit, icon: Icon, accent }, i) => (
-          <motion.div
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 anim-fade-up anim-delay-1">
+        {(
+          [
+            {
+              label: "Records",
+              value: stats?.total ?? "\u2014",
+              unit: "",
+              icon: Database,
+              accent: "text-white",
+            },
+            {
+              label: "Agents",
+              value: stats?.agents ?? "\u2014",
+              unit: "",
+              icon: Users,
+              accent: "text-[#F7931A]",
+            },
+            {
+              label: "Actions",
+              value: stats?.actions ?? "\u2014",
+              unit: "",
+              icon: Activity,
+              accent: "text-[#00F0FF]",
+            },
+            {
+              label: "Settled",
+              value: stats?.totalSats
+                ? stats.totalSats.toLocaleString()
+                : "\u2014",
+              unit: stats?.totalSats ? "sats" : "",
+              icon: Zap,
+              accent: "text-emerald-400",
+            },
+          ] as const
+        ).map(({ label, value, unit, icon: Icon, accent }) => (
+          <Card
             key={label}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.05 + i * 0.03 }}
+            className="group hover:border-white/[0.1] transition-all duration-300"
           >
-            <Card className="group hover:border-white/[0.1] transition-all duration-300">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon className={`h-3.5 w-3.5 ${accent} opacity-50`} />
-                  <p className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
-                    {label}
-                  </p>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <p
-                    className={`text-2xl lg:text-3xl font-bold tracking-tight ${accent}`}
-                  >
-                    {value}
-                  </p>
-                  {unit && (
-                    <span className="text-[11px] text-white/15">{unit}</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Icon className={`h-3.5 w-3.5 ${accent} opacity-50`} />
+                <p className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
+                  {label}
+                </p>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <p
+                  className={`text-2xl lg:text-3xl font-bold tracking-tight ${accent}`}
+                >
+                  {value}
+                </p>
+                {unit && (
+                  <span className="text-[11px] text-white/15">{unit}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         ))}
-      </motion.div>
+      </div>
 
-      {/* Main Content Grid */}
+      {/* Main Content: Feed + Global Index */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-        {/* Feed */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
-          className="space-y-4"
-        >
+        {/* Center: Feed */}
+        <div className="space-y-4 anim-fade-up anim-delay-3">
           {/* Filter Tabs */}
           <div className="flex items-center gap-1 p-1 bg-white/[0.02] rounded-lg border border-white/[0.04] w-fit">
             {filterTabs.map((tab) => (
@@ -206,13 +192,13 @@ export default function Dashboard() {
               ))
             ) : filteredRecords?.length ? (
               <AnimatePresence mode="popLayout">
-                {filteredRecords.slice(0, 20).map(({ id, record }, i) => (
+                {filteredRecords.slice(0, 20).map(({ id, record }) => (
                   <motion.div
                     key={id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ delay: i * 0.02 }}
+                    layout
                   >
                     <RecordCard id={id} record={record} />
                   </motion.div>
@@ -234,15 +220,10 @@ export default function Dashboard() {
               </Card>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Global Index */}
-        <motion.div
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-4"
-        >
+        {/* Right: Global Index */}
+        <div className="space-y-4 anim-fade-right anim-delay-5">
           <Card className="glass-active">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -330,7 +311,7 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -13,19 +13,20 @@ import { Zap, Copy, Check } from "lucide-react";
 import type { SettleResult } from "@/lib/types";
 
 function HashGrid({ hash }: { hash: string }) {
-  const cells = hash.slice(0, 64).split("").map((c, i) => {
-    const val = parseInt(c, 16);
-    const opacity = (val / 15) * 0.8 + 0.1;
-    return (
-      <div
-        key={i}
-        className="rounded-[2px]"
-        style={{
-          background: `rgba(247, 147, 26, ${opacity})`,
-        }}
-      />
-    );
-  });
+  const cells = hash
+    .slice(0, 64)
+    .split("")
+    .map((c, i) => {
+      const val = parseInt(c, 16);
+      const opacity = (val / 15) * 0.8 + 0.1;
+      return (
+        <div
+          key={i}
+          className="rounded-[2px]"
+          style={{ background: `rgba(247, 147, 26, ${opacity})` }}
+        />
+      );
+    });
   return (
     <div className="grid grid-cols-8 gap-[3px] w-[120px] h-[120px] p-3 bg-black rounded-xl border border-white/[0.06]">
       {cells}
@@ -60,22 +61,18 @@ export default function SettlePage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl space-y-6"
-    >
+    <div className="max-w-2xl space-y-6 anim-fade-up">
       <div>
-        <h2 className="text-2xl font-bold tracking-tighter">
+        <h2 className="text-[48px] font-bold tracking-tighter leading-none">
           <span className="text-emerald-400">Lightning</span>{" "}
           <span className="text-white/90">Settlement</span>
         </h2>
-        <p className="text-white/25 text-sm mt-1">
+        <p className="text-white/25 text-sm mt-2">
           Economic settlement via the Lightning Network
         </p>
       </div>
 
-      {/* Create Settlement */}
+      {/* One-button Request Sats */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -119,14 +116,15 @@ export default function SettlePage() {
         </CardContent>
       </Card>
 
-      {/* Settlement Result */}
+      {/* Settlement Result with QR-like HashGrid */}
       <AnimatePresence>
         {result && (
           <motion.div
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
           >
-            <Card className="border-emerald-500/20 glass-active">
+            <Card className="border-emerald-500/20 glass-active relative">
+              <div className="ripple absolute inset-0 rounded-lg pointer-events-none" />
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-emerald-400 flex items-center gap-2">
@@ -140,9 +138,7 @@ export default function SettlePage() {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-start gap-6">
-                  {/* Hash Grid (QR-like visual) */}
                   <HashGrid hash={result.payment_hash} />
-
                   <div className="flex-1 space-y-3">
                     <div>
                       <p className="text-[10px] text-white/25 mb-1 uppercase tracking-wider">
@@ -182,12 +178,10 @@ export default function SettlePage() {
                     </div>
                   </div>
                 </div>
-
                 <div className="p-3 bg-white/[0.02] rounded-lg border border-white/[0.03]">
                   <p className="text-[11px] text-white/20">
                     In production, the preimage is revealed only after Lightning
-                    payment confirmation. This demo generates it locally for
-                    testing.
+                    payment confirmation. This demo generates it locally.
                   </p>
                 </div>
               </CardContent>
@@ -196,9 +190,8 @@ export default function SettlePage() {
         )}
       </AnimatePresence>
 
-      {/* Preimage Verifier */}
       <PreimageVerifier />
-    </motion.div>
+    </div>
   );
 }
 

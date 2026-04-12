@@ -36,7 +36,43 @@
   }
 }
 
+/* ── Entrance animations (CSS-first, no JS required) ──────────────────── */
+
+.anim-fade-in {
+  animation: fadeIn 0.5s ease-out both;
+}
+.anim-fade-up {
+  animation: fadeUp 0.5s ease-out both;
+}
+.anim-fade-right {
+  animation: fadeRight 0.6s ease-out both;
+}
+.anim-delay-1 { animation-delay: 50ms; }
+.anim-delay-2 { animation-delay: 100ms; }
+.anim-delay-3 { animation-delay: 150ms; }
+.anim-delay-4 { animation-delay: 200ms; }
+.anim-delay-5 { animation-delay: 300ms; }
+.anim-delay-6 { animation-delay: 400ms; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* ── Shimmer skeleton ─────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
 
 .skeleton-shimmer {
   background: linear-gradient(
@@ -64,6 +100,34 @@
     0 0 40px rgba(0, 240, 255, 0.02);
 }
 
+/* ── Pulse glow for validated DAG nodes ───────────────────────────────── */
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(247, 147, 26, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(247, 147, 26, 0.6); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Ripple on inscription ────────────────────────────────────────────── */
+
+@keyframes ripple {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(247, 147, 26, 0.4);
+  animation: ripple 1.2s ease-out forwards;
+  pointer-events: none;
+}
+
 /* ── Custom scrollbar ─────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
@@ -80,7 +144,7 @@
   background: hsl(0 0% 22%);
 }
 
-/* ── React Flow overrides ─────────────────────────────────────────────── */
+/* ── React Flow overrides (glowing orbs + hover chain links) ──────────── */
 
 .react-flow__node {
   transition: box-shadow 0.3s ease, transform 0.2s ease;
@@ -92,20 +156,7 @@
 .react-flow__edge-path {
   transition: stroke-width 0.2s ease;
 }
-
-/* ── Utility animations ───────────────────────────────────────────────── */
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes ripple {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2.4); opacity: 0; }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(247, 147, 26, 0.3); }
-  50% { box-shadow: 0 0 24px rgba(247, 147, 26, 0.6); }
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 6px rgba(247, 147, 26, 0.4));
 }
