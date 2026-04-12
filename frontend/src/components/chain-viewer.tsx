@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   Background,
@@ -25,6 +26,15 @@ const TYPE_GLOW: Record<string, string> = {
 };
 
 export function ChainViewer({ records }: { records: RecordWithId[] }) {
+  const router = useRouter();
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      router.push(`/explorer/${node.id}`);
+    },
+    [router]
+  );
+
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = records.map((r, i) => ({
       id: r.id,
@@ -58,6 +68,7 @@ export function ChainViewer({ records }: { records: RecordWithId[] }) {
         borderRadius: "14px",
         padding: "10px",
         width: 220,
+        cursor: "pointer",
         boxShadow: TYPE_GLOW[r.record.type] || "none",
         transition: "box-shadow 0.3s ease, transform 0.2s ease",
       },
@@ -118,6 +129,7 @@ export function ChainViewer({ records }: { records: RecordWithId[] }) {
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      onNodeClick={onNodeClick}
       fitView
       fitViewOptions={{ padding: 0.3 }}
       proOptions={{ hideAttribution: true }}

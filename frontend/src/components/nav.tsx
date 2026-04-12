@@ -1,15 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   PlusCircle,
   GitBranch,
   Zap,
   KeyRound,
+  Menu,
+  X,
 } from "lucide-react";
 
 const links = [
@@ -22,12 +25,13 @@ const links = [
 
 export function Nav() {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
-  return (
-    <aside className="w-[260px] shrink-0 border-r border-white/[0.04] bg-black flex flex-col">
+  const sidebar = (
+    <>
       {/* Logo */}
       <div className="p-6 pb-4">
-        <Link href="/" className="block">
+        <Link href="/" onClick={() => setOpen(false)} className="block">
           <h1 className="text-2xl font-bold tracking-tighter">
             <span className="text-[#F7931A]">ARC</span>
           </h1>
@@ -47,7 +51,12 @@ export function Nav() {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
-            <Link key={href} href={href} className="relative block">
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setOpen(false)}
+              className="relative block"
+            >
               <div
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all duration-200",
@@ -83,6 +92,55 @@ export function Nav() {
           </p>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#111111]/80 backdrop-blur-xl border border-white/[0.06] text-white/60 hover:text-white transition-colors"
+        aria-label="Open navigation"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-[260px] shrink-0 border-r border-white/[0.04] bg-black flex-col">
+        {sidebar}
+      </aside>
+
+      {/* Mobile overlay */}
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              className="lg:hidden fixed inset-y-0 left-0 z-50 w-[260px] bg-black border-r border-white/[0.04] flex flex-col"
+            >
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-md text-white/30 hover:text-white/60 transition-colors"
+                aria-label="Close navigation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {sidebar}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

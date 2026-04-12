@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { Providers } from "@/components/providers";
+import { CursorGlow } from "@/components/cursor-glow";
 
 export const metadata: Metadata = {
   title: {
@@ -71,11 +72,12 @@ export default function RootLayout({
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
     >
       <body className={`${GeistSans.className} antialiased`}>
+        <CursorGlow />
         <Providers>
           <div className="flex h-screen overflow-hidden bg-black">
             <Nav />
             <main className="flex-1 overflow-y-auto">
-              <div className="max-w-7xl mx-auto p-6 lg:p-8">{children}</div>
+              <div className="max-w-7xl mx-auto p-6 pt-16 lg:pt-8 lg:p-8">{children}</div>
             </main>
           </div>
         </Providers>
