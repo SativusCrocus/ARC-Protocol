@@ -6,9 +6,58 @@ import { Nav } from "@/components/nav";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "ARC Protocol",
+  title: {
+    default: "ARC Protocol",
+    template: "%s | ARC Protocol",
+  },
   description:
-    "Agent Record Convention – Bitcoin-native infrastructure for AI agents",
+    "Bitcoin-native identity, provenance, and economic settlement for autonomous AI agents. Every action becomes a signed, chain-linked Bitcoin inscription.",
+  keywords: [
+    "Bitcoin",
+    "AI agents",
+    "BIP-340",
+    "Schnorr",
+    "provenance",
+    "inscriptions",
+    "Lightning Network",
+    "Taproot",
+  ],
+  authors: [{ name: "ARC Protocol" }],
+  creator: "ARC Protocol",
+  metadataBase: new URL("https://arc-protocol-six.vercel.app"),
+  openGraph: {
+    title: "ARC Protocol",
+    description:
+      "Bitcoin-native identity, provenance, and economic settlement for autonomous AI agents.",
+    url: "https://arc-protocol-six.vercel.app",
+    siteName: "ARC Protocol",
+    images: [
+      {
+        url: "/og.svg",
+        width: 1200,
+        height: 630,
+        alt: "ARC Protocol – Bitcoin-native AI agent infrastructure",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ARC Protocol",
+    description:
+      "Bitcoin-native identity, provenance, and economic settlement for autonomous AI agents.",
+    images: ["/og.svg"],
+  },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({

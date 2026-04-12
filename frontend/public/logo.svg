@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7931A"/>
+      <stop offset="100%" stop-color="#E8820A"/>
+    </linearGradient>
+    <linearGradient id="cyan-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#00B4CC" stop-opacity="0.3"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glow-cyan">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle (subtle) -->
+  <circle cx="256" cy="256" r="240" fill="#000000"/>
+  <circle cx="256" cy="256" r="240" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1" fill="none"/>
+
+  <!-- Outer arc — the main ARC shape (270° sweep) -->
+  <path
+    d="M 256 56 A 200 200 0 1 1 56 256"
+    stroke="url(#arc-grad)"
+    stroke-width="28"
+    stroke-linecap="round"
+    fill="none"
+    filter="url(#glow)"
+  />
+
+  <!-- Chain link nodes on the arc -->
+  <!-- Node 1: top center (genesis) -->
+  <circle cx="256" cy="56" r="14" fill="#F7931A" filter="url(#glow)"/>
+  <circle cx="256" cy="56" r="6" fill="#000000"/>
+
+  <!-- Node 2: top right -->
+  <circle cx="397" cy="103" r="10" fill="#F7931A" opacity="0.8"/>
+  <circle cx="397" cy="103" r="4" fill="#000000"/>
+
+  <!-- Node 3: right -->
+  <circle cx="456" cy="256" r="10" fill="#F7931A" opacity="0.8"/>
+  <circle cx="456" cy="256" r="4" fill="#000000"/>
+
+  <!-- Node 4: bottom right -->
+  <circle cx="397" cy="409" r="10" fill="#F7931A" opacity="0.8"/>
+  <circle cx="397" cy="409" r="4" fill="#000000"/>
+
+  <!-- Node 5: bottom center -->
+  <circle cx="256" cy="456" r="10" fill="#00F0FF" opacity="0.7" filter="url(#glow-cyan)"/>
+  <circle cx="256" cy="456" r="4" fill="#000000"/>
+
+  <!-- Node 6: bottom left -->
+  <circle cx="115" cy="409" r="10" fill="#00F0FF" opacity="0.5"/>
+  <circle cx="115" cy="409" r="4" fill="#000000"/>
+
+  <!-- Node 7: left (end of arc) -->
+  <circle cx="56" cy="256" r="14" fill="#00F0FF" opacity="0.6" filter="url(#glow-cyan)"/>
+  <circle cx="56" cy="256" r="6" fill="#000000"/>
+
+  <!-- Inner accent arc (partial, thinner) -->
+  <path
+    d="M 256 116 A 140 140 0 1 1 116 256"
+    stroke="url(#cyan-grad)"
+    stroke-width="2"
+    stroke-linecap="round"
+    fill="none"
+    stroke-dasharray="8 12"
+  />
+
+  <!-- Center text: ARC -->
+  <text
+    x="256" y="244"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-weight="800"
+    font-size="96"
+    letter-spacing="-4"
+    fill="#F7931A"
+  >ARC</text>
+
+  <!-- Subtitle -->
+  <text
+    x="256" y="296"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-weight="500"
+    font-size="18"
+    letter-spacing="8"
+    fill="#ffffff"
+    fill-opacity="0.25"
+  >PROTOCOL</text>
+</svg>

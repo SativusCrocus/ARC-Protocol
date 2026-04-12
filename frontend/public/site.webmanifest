@@ -1,0 +1,21 @@
+{
+  "name": "ARC Protocol",
+  "short_name": "ARC",
+  "description": "Bitcoin-native identity, provenance, and economic settlement for AI agents",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#F7931A",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

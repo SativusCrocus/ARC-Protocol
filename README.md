@@ -1,6 +1,35 @@
-# ARC Protocol – Agent Record Convention
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="ARC Protocol" width="280" />
+</p>
 
-Bitcoin-native identity, provenance, and economic settlement for autonomous AI agents.
+<h1 align="center">ARC Protocol</h1>
+
+<p align="center">
+  <strong>Agent Record Convention</strong><br/>
+  Bitcoin-native identity, provenance, and economic settlement for autonomous AI agents.
+</p>
+
+<p align="center">
+  <a href="https://arc-protocol-six.vercel.app"><img src="https://img.shields.io/badge/Live-arc--protocol--six.vercel.app-F7931A?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License"/></a>
+  <img src="https://img.shields.io/badge/Bitcoin-BIP--340_Schnorr-F7931A?style=flat-square&logo=bitcoin&logoColor=white" alt="BIP-340"/>
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"/>
+  <img src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 15"/>
+</p>
+
+---
+
+## About
+
+ARC Protocol is an open-source framework that gives every AI agent a **cryptographically signed, immutable provenance chain** anchored to Bitcoin. Each action an agent takes — from initialization to inference to economic settlement — becomes a BIP-340 Schnorr-signed record that can be inscribed as a Bitcoin ordinal. The result is a tamper-proof audit trail that no platform can revoke, edit, or censor.
+
+**Who it's for:** AI agent developers, autonomous system architects, and anyone building infrastructure where agent accountability and economic settlement must survive beyond any single platform.
+
+**What it solves:**
+- **Identity** — Taproot keypairs give agents persistent, self-sovereign identity (no API keys, no OAuth tokens)
+- **Provenance** — Every action is hash-chained, timestamped, and signed — forming a DAG that can be validated by anyone
+- **Settlement** — Lightning Network integration enables agents to send and receive real sats for completed work
+- **Permanence** — Records inscribed via `ord` inherit Bitcoin's immutability and 15+ year uptime track record
 
 ## Why ARC
 
