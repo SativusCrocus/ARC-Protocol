@@ -27,7 +27,7 @@ export default function CreatePage() {
     <div className="space-y-6 anim-fade-up">
       <div>
         <h2 className="text-[48px] font-bold tracking-tighter leading-none">
-          <span className="text-[#F7931A]">Inscribe</span>{" "}
+          <span className="text-[#F7931A] text-glow-orange">Inscribe</span>{" "}
           <span className="text-white/90">Record</span>
         </h2>
         <p className="text-white/25 text-sm mt-2">

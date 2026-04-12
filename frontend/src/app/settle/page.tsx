@@ -64,7 +64,7 @@ export default function SettlePage() {
     <div className="max-w-2xl space-y-6 anim-fade-up">
       <div>
         <h2 className="text-[48px] font-bold tracking-tighter leading-none">
-          <span className="text-emerald-400">Lightning</span>{" "}
+          <span className="text-emerald-400" style={{ textShadow: "0 0 40px rgba(34,197,94,0.3), 0 0 80px rgba(34,197,94,0.1)" }}>Lightning</span>{" "}
           <span className="text-white/90">Settlement</span>
         </h2>
         <p className="text-white/25 text-sm mt-2">

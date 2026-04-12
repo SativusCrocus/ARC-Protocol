@@ -48,7 +48,7 @@ export default function ExplorerPage() {
     <div className="space-y-6 anim-fade-up">
       <div>
         <h2 className="text-[48px] font-bold tracking-tighter leading-none">
-          <span className="text-[#00F0FF]">Memory</span>{" "}
+          <span className="text-[#00F0FF] text-glow-cyan">Memory</span>{" "}
           <span className="text-white/90">DAG</span>
         </h2>
         <p className="text-white/25 text-sm mt-2">

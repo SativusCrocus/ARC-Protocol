@@ -25,7 +25,7 @@ export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
 
   return (
     <Link href={`/explorer/${id}`}>
-      <div className="group relative rounded-lg border border-white/[0.04] bg-[#111111]/60 backdrop-blur-sm hover:border-white/[0.08] hover:bg-[#111111]/80 transition-all duration-200 cursor-pointer">
+      <div className="group relative glow-card rounded-lg border border-white/[0.04] bg-[#111111]/60 backdrop-blur-sm hover:border-white/[0.08] hover:bg-[#111111]/80 hover:shadow-[0_0_20px_rgba(247,147,26,0.03)] transition-all duration-300 cursor-pointer">
         <div className="p-4 flex items-center gap-4">
           {/* Type indicator dot */}
           <div className="relative">

@@ -60,7 +60,7 @@ export default function WalletPage() {
     <div className="max-w-2xl space-y-6 anim-fade-up">
       <div>
         <h2 className="text-[48px] font-bold tracking-tighter leading-none">
-          <span className="text-[#F7931A]">Taproot</span>{" "}
+          <span className="text-[#F7931A] text-glow-orange">Taproot</span>{" "}
           <span className="text-white/90">Keys</span>
         </h2>
         <p className="text-white/25 text-sm mt-2">

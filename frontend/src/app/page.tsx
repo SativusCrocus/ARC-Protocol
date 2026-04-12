@@ -78,17 +78,18 @@ export default function Dashboard() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Hero */}
       <div className="flex items-center justify-between anim-fade-up">
         <div>
-          <h2 className="text-[48px] font-bold tracking-tighter leading-none">
-            <span className="text-[#F7931A]">ARC</span>{" "}
+          <h2 className="text-[56px] font-bold tracking-tighter leading-none">
+            <span className="text-[#F7931A] text-glow-orange">ARC</span>{" "}
             <span className="text-white/90">Protocol</span>
           </h2>
-          <p className="text-white/25 text-sm mt-2">
+          <p className="text-white/25 text-sm mt-2 tracking-wide">
             Immutable provenance ledger for autonomous agents
           </p>
+          <div className="accent-line w-48 mt-4" />
         </div>
         <Link href="/create">
           <Button className="gap-2">
@@ -99,7 +100,7 @@ export default function Dashboard() {
       </div>
 
       {/* Bento Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 anim-fade-up anim-delay-1">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 anim-fade-up anim-delay-1">
         {(
           [
             {
@@ -108,6 +109,7 @@ export default function Dashboard() {
               unit: "",
               icon: Database,
               accent: "text-white",
+              glow: "group-hover:shadow-[0_0_30px_rgba(255,255,255,0.05)]",
             },
             {
               label: "Agents",
@@ -115,6 +117,7 @@ export default function Dashboard() {
               unit: "",
               icon: Users,
               accent: "text-[#F7931A]",
+              glow: "group-hover:shadow-[0_0_30px_rgba(247,147,26,0.08)]",
             },
             {
               label: "Actions",
@@ -122,6 +125,7 @@ export default function Dashboard() {
               unit: "",
               icon: Activity,
               accent: "text-[#00F0FF]",
+              glow: "group-hover:shadow-[0_0_30px_rgba(0,240,255,0.08)]",
             },
             {
               label: "Settled",
@@ -131,23 +135,24 @@ export default function Dashboard() {
               unit: stats?.totalSats ? "sats" : "",
               icon: Zap,
               accent: "text-emerald-400",
+              glow: "group-hover:shadow-[0_0_30px_rgba(34,197,94,0.08)]",
             },
           ] as const
-        ).map(({ label, value, unit, icon: Icon, accent }) => (
+        ).map(({ label, value, unit, icon: Icon, accent, glow }) => (
           <Card
             key={label}
-            className="group hover:border-white/[0.1] transition-all duration-300"
+            className={`group glow-card hover:border-white/[0.1] transition-all duration-500 ${glow}`}
           >
-            <CardContent className="p-4">
+            <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
-                <Icon className={`h-3.5 w-3.5 ${accent} opacity-50`} />
+                <Icon className={`h-3.5 w-3.5 ${accent} opacity-50 group-hover:opacity-80 transition-opacity`} />
                 <p className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
                   {label}
                 </p>
               </div>
               <div className="flex items-baseline gap-1.5">
                 <p
-                  className={`text-2xl lg:text-3xl font-bold tracking-tight ${accent}`}
+                  className={`text-2xl lg:text-3xl font-bold tracking-tight ${accent} anim-count-up`}
                 >
                   {value}
                 </p>
@@ -161,7 +166,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content: Feed + Global Index */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         {/* Center: Feed */}
         <div className="space-y-4 anim-fade-up anim-delay-3">
           {/* Filter Tabs */}
@@ -172,7 +177,7 @@ export default function Dashboard() {
                 onClick={() => setFilter(tab.key)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   filter === tab.key
-                    ? "bg-white/[0.08] text-white"
+                    ? "bg-white/[0.08] text-white shadow-[0_0_10px_rgba(247,147,26,0.06)]"
                     : "text-white/25 hover:text-white/50"
                 }`}
               >
@@ -188,16 +193,18 @@ export default function Dashboard() {
                 <div
                   key={i}
                   className="h-[72px] rounded-lg skeleton-shimmer"
+                  style={{ animationDelay: `${i * 100}ms` }}
                 />
               ))
             ) : filteredRecords?.length ? (
               <AnimatePresence mode="popLayout">
-                {filteredRecords.slice(0, 20).map(({ id, record }) => (
+                {filteredRecords.slice(0, 20).map(({ id, record }, i) => (
                   <motion.div
                     key={id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ delay: i * 0.03 }}
                     layout
                   >
                     <RecordCard id={id} record={record} />
@@ -205,13 +212,16 @@ export default function Dashboard() {
                 ))}
               </AnimatePresence>
             ) : (
-              <Card>
+              <Card className="glow-card">
                 <CardContent className="p-12 text-center">
-                  <div className="w-12 h-12 rounded-full bg-white/[0.03] flex items-center justify-center mx-auto mb-4">
-                    <Database className="h-5 w-5 text-white/15" />
+                  <div className="w-14 h-14 rounded-full bg-white/[0.03] flex items-center justify-center mx-auto mb-4 border border-white/[0.04]">
+                    <Database className="h-6 w-6 text-white/15" />
                   </div>
-                  <p className="text-white/25 mb-4 text-sm">
-                    No records yet. Create a genesis record to begin.
+                  <p className="text-white/30 mb-1 text-sm font-medium">
+                    No records yet
+                  </p>
+                  <p className="text-white/15 mb-6 text-xs">
+                    Create a genesis record to begin the provenance chain
                   </p>
                   <Link href="/create">
                     <Button size="sm">Create Genesis</Button>
@@ -224,7 +234,7 @@ export default function Dashboard() {
 
         {/* Right: Global Index */}
         <div className="space-y-4 anim-fade-right anim-delay-5">
-          <Card className="glass-active">
+          <Card className="glass-active glow-card">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-3.5 w-3.5 text-[#00F0FF]" />
@@ -232,6 +242,7 @@ export default function Dashboard() {
                   Global Index
                 </CardTitle>
               </div>
+              <div className="accent-line mt-2" />
             </CardHeader>
             <CardContent className="space-y-3">
               {agentRanking.length > 0 ? (
@@ -254,12 +265,14 @@ export default function Dashboard() {
                           ` \u00b7 ${agent.sats.toLocaleString()} sats`}
                       </p>
                     </div>
-                    <div className="h-1 rounded-full bg-white/[0.04] w-12">
-                      <div
-                        className="h-full rounded-full bg-[#F7931A]/40"
-                        style={{
+                    <div className="h-1.5 rounded-full bg-white/[0.04] w-14 overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-[#F7931A]/60 to-[#F7931A]/30"
+                        initial={{ width: 0 }}
+                        animate={{
                           width: `${Math.min(100, (agent.count / (agentRanking[0]?.count || 1)) * 100)}%`,
                         }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
                       />
                     </div>
                   </Link>
@@ -280,28 +293,33 @@ export default function Dashboard() {
                 label: "New Genesis",
                 icon: PlusCircle,
                 desc: "Create identity",
+                color: "#F7931A",
               },
               {
                 href: "/explorer",
                 label: "Memory DAG",
                 icon: Activity,
                 desc: "Explore chains",
+                color: "#00F0FF",
               },
               {
                 href: "/settle",
                 label: "Settlement",
                 icon: Zap,
                 desc: "Lightning payment",
+                color: "#22c55e",
               },
-            ].map(({ href, label, icon: Icon, desc }) => (
+            ].map(({ href, label, icon: Icon, desc, color }) => (
               <Link key={href} href={href}>
-                <Card className="hover:border-white/[0.1] transition-all duration-200 cursor-pointer mb-2">
+                <Card className="glow-card hover:border-white/[0.1] transition-all duration-300 cursor-pointer mb-2 group">
                   <CardContent className="p-3 flex items-center gap-3">
-                    <div className="p-1.5 rounded-md bg-white/[0.03]">
-                      <Icon className="h-3.5 w-3.5 text-[#F7931A]/60" />
+                    <div
+                      className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.04] group-hover:border-white/[0.08] transition-colors"
+                    >
+                      <Icon className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" style={{ color }} />
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-white/60">
+                      <p className="text-xs font-medium text-white/60 group-hover:text-white/90 transition-colors">
                         {label}
                       </p>
                       <p className="text-[10px] text-white/15">{desc}</p>

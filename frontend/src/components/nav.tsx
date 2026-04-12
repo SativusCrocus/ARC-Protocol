@@ -72,7 +72,7 @@ export function Nav() {
                 {active && (
                   <motion.div
                     layoutId="nav-indicator"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-[#F7931A] rounded-full"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#F7931A] rounded-full shadow-[0_0_12px_rgba(247,147,26,0.5)]"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}

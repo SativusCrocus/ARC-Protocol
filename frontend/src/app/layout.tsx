@@ -72,12 +72,13 @@ export default function RootLayout({
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
     >
       <body className={`${GeistSans.className} antialiased`}>
+        <div className="ambient-grid" />
         <CursorGlow />
         <Providers>
-          <div className="flex h-screen overflow-hidden bg-black">
+          <div className="relative z-10 flex h-screen overflow-hidden bg-black/90">
             <Nav />
             <main className="flex-1 overflow-y-auto">
-              <div className="max-w-7xl mx-auto p-6 pt-16 lg:pt-8 lg:p-8">{children}</div>
+              <div className="max-w-7xl mx-auto px-4 pt-16 pb-6 sm:px-6 lg:px-8 lg:pt-8 lg:pb-8">{children}</div>
             </main>
           </div>
         </Providers>
