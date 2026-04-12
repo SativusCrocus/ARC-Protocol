@@ -15,6 +15,10 @@ import {
   Zap,
   Database,
   TrendingUp,
+  Store,
+  GitBranch,
+  Bot,
+  ArrowUpRight,
 } from "lucide-react";
 
 const filterTabs = [
@@ -163,6 +167,88 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Live Demos */}
+      <div className="space-y-3 anim-fade-up anim-delay-2">
+        <h3 className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
+          Live Demos
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {([
+            {
+              href: "/marketplace",
+              title: "Live Marketplace",
+              desc: "Two autonomous agents trade services over ARC Protocol. 6-step state machine with Lightning settlement and full provenance.",
+              icon: Store,
+              color: "#F7931A",
+              badge: "6-step protocol",
+            },
+            {
+              href: "/dag",
+              title: "Memory DAG",
+              desc: "Interactive visualization of the provenance graph. Every record is a node, every prev/memref is an edge. Click to explore.",
+              icon: GitBranch,
+              color: "#00F0FF",
+              badge: "React Flow",
+            },
+            {
+              href: "/marketplace",
+              title: "Autonomous Services",
+              desc: "Customer requests mempool analysis, service agent delivers, Lightning settles. Dispute resolution walks the cross-agent DAG.",
+              icon: Bot,
+              color: "#22c55e",
+              badge: "BIP-340 signed",
+              hash: "#demo",
+            },
+          ] as const).map(({ href, title, desc, icon: Icon, color, badge, hash }) => (
+            <Link key={title} href={`${href}${hash || ""}`}>
+              <Card className="glow-card group hover:border-white/[0.12] transition-all duration-500 cursor-pointer h-full relative overflow-hidden">
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                  style={{
+                    background: `radial-gradient(ellipse at 50% 0%, ${color}08, transparent 70%)`,
+                  }}
+                />
+                <CardContent className="p-5 relative">
+                  <div className="flex items-start justify-between mb-3">
+                    <div
+                      className="p-2.5 rounded-xl border transition-all duration-300"
+                      style={{
+                        backgroundColor: `${color}08`,
+                        borderColor: `${color}15`,
+                      }}
+                    >
+                      <Icon
+                        className="h-5 w-5 transition-all duration-300 group-hover:scale-110"
+                        style={{ color }}
+                      />
+                    </div>
+                    <ArrowUpRight
+                      className="h-4 w-4 text-white/10 group-hover:text-white/40 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                    />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors mb-1.5">
+                    {title}
+                  </h4>
+                  <p className="text-[11px] text-white/20 leading-relaxed mb-3">
+                    {desc}
+                  </p>
+                  <span
+                    className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                    style={{
+                      color,
+                      backgroundColor: `${color}10`,
+                      borderColor: `${color}20`,
+                    }}
+                  >
+                    {badge}
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Main Content: Feed + Global Index */}
