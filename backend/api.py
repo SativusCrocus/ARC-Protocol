@@ -5,6 +5,7 @@ Private keys never touch the API transport layer.
 
 import os
 import re
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,6 +16,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 import arc
+import marketplace as mkt
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -82,6 +84,21 @@ class SettleReq(BaseModel):
     def validate_record_hex(cls, v: str) -> str:
         if not _HEX64.match(v):
             raise ValueError("record_id must be a 64-char lowercase hex string")
+        return v
+
+
+class GenerateReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    content_type: str = Field("article")
+    price_sats: int = Field(1000, gt=0, le=21_000_000_00_000_000)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("content_type")
+    @classmethod
+    def validate_content_type(cls, v: str) -> str:
+        allowed = {"article", "code", "analysis", "image_desc", "summary", "creative"}
+        if v not in allowed:
+            raise ValueError(f"content_type must be one of: {', '.join(sorted(allowed))}")
         return v
 
 
@@ -269,3 +286,257 @@ def inscription(request: Request, record_id: str):
     if not record:
         raise HTTPException(404, "Record not found")
     return {"command": arc.inscription_envelope(record), "record": record}
+
+
+# ── Marketplace ────────────────────────────────────────────────────────────
+
+
+def _ensure_content_table(db):
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS content (
+        record_id TEXT PRIMARY KEY, prompt TEXT NOT NULL, output TEXT NOT NULL,
+        content_type TEXT NOT NULL, price_sats INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL)"""
+    )
+    db.commit()
+
+
+@app.post("/generate")
+@limiter.limit("10/minute")
+def generate(request: Request, req: GenerateReq):
+    """Generate AI content via Ollama and create ARC action inscription."""
+    try:
+        key = arc.load_key()
+    except Exception:
+        arc.generate_keypair("marketplace")
+        key = arc.load_key()
+
+    db = arc.get_db()
+    _ensure_content_table(db)
+    pub = arc.xonly_pubkey(key).hex()
+
+    # Find latest record for this agent, or create genesis
+    rows = arc.fetch_by_pubkey(db, pub)
+    genesis_result = None
+    if not rows:
+        genesis_rec = arc.build_record(
+            "genesis", key, "Marketplace agent initialized",
+            alias="marketplace",
+            ihash=arc.sha256hex(b"marketplace-genesis"),
+        )
+        genesis_id = _verify_and_store(db, genesis_rec)
+        prev_id = genesis_id
+        genesis_result = {"id": genesis_id, "record": genesis_rec}
+    else:
+        prev_id = rows[-1][0]
+
+    # Call Ollama
+    output = arc.ollama_generate(req.prompt, req.model)
+
+    ihash = arc.sha256hex(req.prompt.encode())
+    ohash = arc.sha256hex(output.encode())
+
+    rec = arc.build_record(
+        "action", key,
+        f"{req.content_type}: {req.prompt[:100]}",
+        prev=prev_id,
+        ihash=ihash, ohash=ohash,
+    )
+    rid = _verify_and_store(db, rec)
+
+    # Store content alongside ARC record
+    db.execute(
+        "INSERT OR REPLACE INTO content VALUES (?,?,?,?,?,?)",
+        (rid, req.prompt, output, req.content_type, req.price_sats,
+         datetime.now(timezone.utc).isoformat()),
+    )
+    db.commit()
+
+    return {
+        "id": rid,
+        "record": rec,
+        "content": output,
+        "prompt": req.prompt,
+        "content_type": req.content_type,
+        "price_sats": req.price_sats,
+        "genesis": genesis_result,
+    }
+
+
+@app.get("/content/{record_id}")
+@limiter.limit("60/minute")
+def get_content(request: Request, record_id: str):
+    """Fetch generated content and its ARC record."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    _ensure_content_table(db)
+    row = db.execute(
+        "SELECT prompt, output, content_type, price_sats, created_at "
+        "FROM content WHERE record_id=?",
+        (record_id,),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "Content not found")
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    # Check if already settled
+    settled = False
+    settlement_id = None
+    for rid, r in arc.all_records(db):
+        if r.get("type") == "settlement" and r.get("prev") == record_id:
+            settled = True
+            settlement_id = rid
+            break
+    return {
+        "id": record_id,
+        "record": record,
+        "prompt": row[0],
+        "output": row[1],
+        "content_type": row[2],
+        "price_sats": row[3],
+        "created_at": row[4],
+        "settled": settled,
+        "settlement_id": settlement_id,
+    }
+
+
+@app.get("/marketplace")
+@limiter.limit("60/minute")
+def list_marketplace(request: Request):
+    """Public marketplace feed – only validated ARC records."""
+    db = arc.get_db()
+    _ensure_content_table(db)
+    rows = db.execute(
+        "SELECT record_id, prompt, output, content_type, price_sats, created_at "
+        "FROM content ORDER BY created_at DESC"
+    ).fetchall()
+    result = []
+    for row in rows:
+        record = arc.fetch(db, row[0])
+        if not record:
+            continue
+        # Signature verification (shallow validation for list performance)
+        valid = arc.verify_sig(record)
+        if not valid:
+            continue
+        result.append({
+            "id": row[0],
+            "record": record,
+            "prompt": row[1],
+            "output": row[2][:500],
+            "content_type": row[3],
+            "price_sats": row[4],
+            "created_at": row[5],
+            "valid": True,
+        })
+    return result
+
+
+# ── Service Marketplace ───────────────────────────────────────────────────
+
+
+class SvcRequestReq(BaseModel):
+    task: str = Field(..., min_length=1, max_length=4096)
+    max_sats: int = Field(..., gt=0, le=21_000_000_00_000_000)
+
+
+class SvcOfferReq(BaseModel):
+    job_id: str = Field(..., min_length=1, max_length=64)
+    price_sats: int = Field(..., gt=0, le=21_000_000_00_000_000)
+
+
+class SvcDeliverReq(BaseModel):
+    job_id: str = Field(..., min_length=1, max_length=64)
+    result: str = Field(..., min_length=1, max_length=65536)
+
+
+class SvcJobIdReq(BaseModel):
+    job_id: str = Field(..., min_length=1, max_length=64)
+
+
+@app.post("/marketplace/request")
+@limiter.limit("30/minute")
+def svc_request(request: Request, req: SvcRequestReq):
+    try:
+        return mkt.request_task(arc.get_db(), req.task, req.max_sats)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/marketplace/offer")
+@limiter.limit("30/minute")
+def svc_offer(request: Request, req: SvcOfferReq):
+    try:
+        return mkt.offer_service(arc.get_db(), req.job_id, req.price_sats)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/marketplace/accept")
+@limiter.limit("30/minute")
+def svc_accept(request: Request, req: SvcJobIdReq):
+    try:
+        return mkt.accept_offer(arc.get_db(), req.job_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/marketplace/deliver")
+@limiter.limit("30/minute")
+def svc_deliver(request: Request, req: SvcDeliverReq):
+    try:
+        return mkt.deliver_work(arc.get_db(), req.job_id, req.result)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/marketplace/pay")
+@limiter.limit("10/minute")
+def svc_pay(request: Request, req: SvcJobIdReq):
+    try:
+        return mkt.pay_invoice(arc.get_db(), req.job_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/marketplace/receipt")
+@limiter.limit("10/minute")
+def svc_receipt(request: Request, req: SvcJobIdReq):
+    try:
+        return mkt.confirm_receipt(arc.get_db(), req.job_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/marketplace/jobs")
+@limiter.limit("60/minute")
+def svc_jobs(request: Request):
+    return mkt.list_jobs(arc.get_db())
+
+
+@app.get("/marketplace/job/{job_id}")
+@limiter.limit("60/minute")
+def svc_job(request: Request, job_id: str):
+    try:
+        return mkt.get_job(arc.get_db(), job_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/marketplace/dispute/{job_id}")
+@limiter.limit("60/minute")
+def svc_dispute(request: Request, job_id: str):
+    try:
+        return mkt.get_dispute_data(arc.get_db(), job_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.post("/marketplace/demo")
+@limiter.limit("5/minute")
+def svc_demo(request: Request):
+    try:
+        return mkt.run_demo(arc.get_db())
+    except ValueError as e:
+        raise HTTPException(400, str(e))

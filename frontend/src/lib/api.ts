@@ -6,6 +6,13 @@ import type {
   SettleResult,
   RecordWithId,
   InscriptionResult,
+  MarketplaceItem,
+  GenerateResult,
+  ContentResult,
+  ARCRecord,
+  ServiceJob,
+  DemoResult,
+  DisputeData,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -66,4 +73,68 @@ export const api = {
 
   inscription: (id: string) =>
     request<InscriptionResult>(`/inscription/${id}`),
+
+  // ── Marketplace ──────────────────────────────────────────────────────
+  generate: (data: {
+    prompt: string;
+    content_type: string;
+    price_sats: number;
+    model?: string;
+  }) =>
+    request<GenerateResult>("/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  content: (id: string) => request<ContentResult>(`/content/${id}`),
+
+  marketplace: () => request<MarketplaceItem[]>("/marketplace"),
+
+  // ── Service Marketplace ───────────────────────────────────────────────
+
+  serviceJobs: () => request<ServiceJob[]>("/marketplace/jobs"),
+
+  serviceJob: (id: string) => request<ServiceJob>(`/marketplace/job/${id}`),
+
+  serviceDispute: (id: string) =>
+    request<DisputeData>(`/marketplace/dispute/${id}`),
+
+  serviceDemo: () =>
+    request<DemoResult>("/marketplace/demo", { method: "POST" }),
+
+  serviceRequest: (data: { task: string; max_sats: number }) =>
+    request<{ job_id: string; request_id: string; record: ARCRecord; status: string }>(
+      "/marketplace/request",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  serviceOffer: (data: { job_id: string; price_sats: number }) =>
+    request<{ job_id: string; offer_id: string; record: ARCRecord; status: string }>(
+      "/marketplace/offer",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  serviceAccept: (data: { job_id: string }) =>
+    request<{ job_id: string; accept_id: string; record: ARCRecord; status: string }>(
+      "/marketplace/accept",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  serviceDeliver: (data: { job_id: string; result: string }) =>
+    request<{ job_id: string; deliver_id: string; record: ARCRecord; status: string }>(
+      "/marketplace/deliver",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  servicePay: (data: { job_id: string }) =>
+    request<{ job_id: string; payment_id: string; payment_hash: string; preimage: string }>(
+      "/marketplace/pay",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  serviceReceipt: (data: { job_id: string }) =>
+    request<{ job_id: string; receipt_id: string; record: ARCRecord; status: string }>(
+      "/marketplace/receipt",
+      { method: "POST", body: JSON.stringify(data) },
+    ),
 };

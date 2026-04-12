@@ -13,12 +13,16 @@ import {
   KeyRound,
   Menu,
   X,
+  Orbit,
+  Store,
 } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },
+  { href: "/dag", label: "Agent DAG", icon: Orbit },
   { href: "/settle", label: "Settlements", icon: Zap },
   { href: "/wallet", label: "Keys", icon: KeyRound },
 ];

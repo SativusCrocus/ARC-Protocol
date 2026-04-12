@@ -62,3 +62,88 @@ export interface InscriptionResult {
   command: string;
   record: ARCRecord;
 }
+
+export interface MarketplaceItem {
+  id: string;
+  record: ARCRecord;
+  prompt: string;
+  output: string;
+  content_type: string;
+  price_sats: number;
+  created_at: string;
+  valid: boolean;
+}
+
+export interface GenerateResult {
+  id: string;
+  record: ARCRecord;
+  content: string;
+  prompt: string;
+  content_type: string;
+  price_sats: number;
+  genesis?: { id: string; record: ARCRecord } | null;
+}
+
+export interface ContentResult {
+  id: string;
+  record: ARCRecord;
+  prompt: string;
+  output: string;
+  content_type: string;
+  price_sats: number;
+  created_at: string;
+  settled: boolean;
+  settlement_id?: string | null;
+}
+
+// ── Service Marketplace Types ─────────────────────────────────────────────
+
+export interface ServiceJob {
+  id: string;
+  status: "requested" | "offered" | "accepted" | "delivered" | "paid" | "completed";
+  customer_pubkey: string;
+  service_pubkey: string | null;
+  task: string;
+  amount_sats: number;
+  request_id: string | null;
+  offer_id: string | null;
+  accept_id: string | null;
+  deliver_id: string | null;
+  payment_id: string | null;
+  receipt_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DemoStep {
+  step: number;
+  agent: "customer" | "service";
+  action: string;
+  job_id: string;
+  record: ARCRecord;
+  status: string;
+  payment_hash?: string;
+  preimage?: string;
+  [key: string]: unknown;
+}
+
+export interface DemoResult {
+  job_id: string;
+  steps: DemoStep[];
+  status: string;
+}
+
+export interface DisputeEdge {
+  source: string;
+  target: string;
+  type: "prev" | "memref";
+}
+
+export interface DisputeData {
+  job: ServiceJob;
+  records: Record<string, ARCRecord>;
+  edges: DisputeEdge[];
+  validations: Record<string, { valid: boolean; errors: string[] }>;
+  deep_validation: { valid: boolean; errors: string[] };
+  record_count: number;
+}
