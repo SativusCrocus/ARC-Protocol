@@ -147,3 +147,24 @@ export interface DisputeData {
   deep_validation: { valid: boolean; errors: string[] };
   record_count: number;
 }
+
+// ── Research Agent Types ─────────────────────────────────────────────────────
+
+export interface ResearchResult {
+  query: string;
+  plan: string;
+  research: string;
+  analysis: string;
+  synthesis: string;
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+}
+
+export interface ResearchChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}

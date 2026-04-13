@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 
 import arc
 import marketplace as mkt
+import research_agent as ra
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -540,3 +541,56 @@ def svc_demo(request: Request):
         return mkt.run_demo(arc.get_db())
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# ── Research Agent ────────────────────────────────────────────────────────────
+
+
+class ResearchReq(BaseModel):
+    query: str = Field(..., min_length=1, max_length=65536)
+    model: str = Field("llama3.2", max_length=64)
+
+
+@app.post("/research")
+@limiter.limit("5/minute")
+def research(request: Request, req: ResearchReq):
+    """Run LangGraph deep research agent with ARC inscriptions."""
+    try:
+        result = ra.run_research(req.query, req.model)
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Research agent error: {str(e)}")
+
+
+@app.get("/research/chain/{record_id}")
+@limiter.limit("60/minute")
+def research_chain(request: Request, record_id: str):
+    """Fetch the full research chain starting from a record."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    # Walk chain backwards
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    # Also gather memref targets
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}

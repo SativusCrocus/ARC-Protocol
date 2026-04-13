@@ -13,6 +13,8 @@ import type {
   ServiceJob,
   DemoResult,
   DisputeData,
+  ResearchResult,
+  ResearchChainResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -137,4 +139,14 @@ export const api = {
       "/marketplace/receipt",
       { method: "POST", body: JSON.stringify(data) },
     ),
+
+  // ── Research Agent ──────────────────────────────────────────────────────
+  research: (data: { query: string; model?: string }) =>
+    request<ResearchResult>("/research", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  researchChain: (id: string) =>
+    request<ResearchChainResult>(`/research/chain/${id}`),
 };
