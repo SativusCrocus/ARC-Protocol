@@ -175,7 +175,7 @@ export default function Dashboard() {
           Live Demos
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {([
+          {[
             {
               href: "/marketplace",
               title: "Live Marketplace",
@@ -193,16 +193,15 @@ export default function Dashboard() {
               badge: "React Flow",
             },
             {
-              href: "/marketplace",
+              href: "/marketplace#demo",
               title: "Autonomous Services",
               desc: "Customer requests mempool analysis, service agent delivers, Lightning settles. Dispute resolution walks the cross-agent DAG.",
               icon: Bot,
               color: "#22c55e",
               badge: "BIP-340 signed",
-              hash: "#demo",
             },
-          ] as const).map(({ href, title, desc, icon: Icon, color, badge, hash }) => (
-            <Link key={title} href={`${href}${hash || ""}`}>
+          ].map(({ href, title, desc, icon: Icon, color, badge }) => (
+            <Link key={title} href={href}>
               <Card className="glow-card group hover:border-white/[0.12] transition-all duration-500 cursor-pointer h-full relative overflow-hidden">
                 <div
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
