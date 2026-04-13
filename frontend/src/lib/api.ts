@@ -17,6 +17,8 @@ import type {
   ResearchChainResult,
   CodegenResult,
   CodegenChainResult,
+  TraderResult,
+  TraderChainResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -161,4 +163,22 @@ export const api = {
 
   codegenChain: (id: string) =>
     request<CodegenChainResult>(`/codegen/chain/${id}`),
+
+  // ── DeFi Trader ──────────────────────────────────────────────────────
+  trader: (data: {
+    market_prompt: string;
+    pair?: string;
+    timeframe?: string;
+    max_risk_pct?: number;
+    max_position_sats?: number;
+    signal_fee_sats?: number;
+    model?: string;
+  }) =>
+    request<TraderResult>("/trader", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  traderChain: (id: string) =>
+    request<TraderChainResult>(`/trader/chain/${id}`),
 };

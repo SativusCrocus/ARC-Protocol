@@ -19,6 +19,7 @@ import arc
 import marketplace as mkt
 import research_agent as ra
 import codegen_agent as cg
+import trader_agent as ta
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -637,6 +638,78 @@ def codegen(request: Request, req: CodegenReq):
 @limiter.limit("60/minute")
 def codegen_chain(request: Request, record_id: str):
     """Fetch the full codegen chain starting from a record."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+# ── DeFi Trader Agent ────────────────────────────────────────────────────────
+
+
+class TraderReq(BaseModel):
+    market_prompt: str = Field(..., min_length=1, max_length=65536)
+    pair: str = Field("BTC/USD", max_length=32)
+    timeframe: str = Field("4h", max_length=16)
+    max_risk_pct: float = Field(2.0, gt=0, le=100)
+    max_position_sats: int = Field(1_000_000, gt=0, le=21_000_000_00_000_000)
+    signal_fee_sats: int = Field(1000, gt=0, le=21_000_000_00_000_000)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, v: str) -> str:
+        allowed = {"1m", "5m", "15m", "1h", "4h", "1d", "1w"}
+        if v not in allowed:
+            raise ValueError(f"timeframe must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+
+@app.post("/trader")
+@limiter.limit("5/minute")
+def trader(request: Request, req: TraderReq):
+    """Run LangGraph DeFi trader agent with ARC inscriptions + Lightning settlement."""
+    try:
+        result = ta.run_trader(
+            market_prompt=req.market_prompt,
+            pair=req.pair,
+            timeframe=req.timeframe,
+            max_risk_pct=req.max_risk_pct,
+            max_position_sats=req.max_position_sats,
+            signal_fee_sats=req.signal_fee_sats,
+            model=req.model,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Trader agent error: {str(e)}")
+
+
+@app.get("/trader/chain/{record_id}")
+@limiter.limit("60/minute")
+def trader_chain(request: Request, record_id: str):
+    """Fetch the full trader chain starting from a record."""
     _validate_hex_id(record_id)
     db = arc.get_db()
     record = arc.fetch(db, record_id)

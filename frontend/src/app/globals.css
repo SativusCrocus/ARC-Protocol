@@ -293,3 +293,50 @@
     transparent 100%
   );
 }
+
+/* ── DeFi Trader Styles ──────────────────────────────────────────────── */
+
+.text-glow-green {
+  text-shadow:
+    0 0 40px rgba(34, 197, 94, 0.3),
+    0 0 80px rgba(34, 197, 94, 0.1);
+}
+
+.trader-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(34, 197, 94, 0.02),
+    0 0 60px rgba(34, 197, 94, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.trader-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(34, 197, 94, 0.04),
+    0 0 80px rgba(34, 197, 94, 0.04);
+}
+
+.trader-dag-glow {
+  box-shadow:
+    0 0 40px rgba(34, 197, 94, 0.05),
+    inset 0 0 40px rgba(34, 197, 94, 0.02);
+  animation: trader-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes trader-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(34, 197, 94, 0.05),
+      inset 0 0 40px rgba(34, 197, 94, 0.02);
+  }
+  50% {
+    box-shadow:
+      0 0 60px rgba(34, 197, 94, 0.08),
+      inset 0 0 60px rgba(34, 197, 94, 0.04);
+  }
+}
+
+.trader-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.trader-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}

@@ -189,3 +189,33 @@ export interface CodegenChainResult {
   chain: RecordWithId[];
   memref_records: RecordWithId[];
 }
+
+// ── DeFi Trader Types ───────────────────────────────────────────────────────
+
+export interface TraderResult {
+  market_prompt: string;
+  pair: string;
+  timeframe: string;
+  max_risk_pct: number;
+  max_position_sats: number;
+  signal_fee_sats: number;
+  scan: string;
+  analysis: string;
+  signal: string;
+  risk_assessment: string;
+  execution_plan: string;
+  settlement_id: string;
+  settlement_hash: string;
+  settlement_preimage: string;
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+}
+
+export interface TraderChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
