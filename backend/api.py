@@ -18,6 +18,7 @@ from slowapi.errors import RateLimitExceeded
 import arc
 import marketplace as mkt
 import research_agent as ra
+import codegen_agent as cg
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -584,6 +585,72 @@ def research_chain(request: Request, record_id: str):
         cur = r.get("prev")
     chain.reverse()
     # Also gather memref targets
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+# ── Code Generator Agent ──────────────────────────────────────────────────────
+
+
+SUPPORTED_LANGUAGES = {
+    "python", "javascript", "typescript", "rust", "go",
+    "bash", "solidity", "ruby", "java", "c",
+}
+
+
+class CodegenReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    language: str = Field("python", max_length=32)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"language must be one of: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
+        return v
+
+
+@app.post("/codegen")
+@limiter.limit("5/minute")
+def codegen(request: Request, req: CodegenReq):
+    """Run LangGraph code generation agent with ARC inscriptions."""
+    try:
+        result = cg.run_codegen(req.prompt, req.language, req.model)
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Codegen agent error: {str(e)}")
+
+
+@app.get("/codegen/chain/{record_id}")
+@limiter.limit("60/minute")
+def codegen_chain(request: Request, record_id: str):
+    """Fetch the full codegen chain starting from a record."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
     memref_records = []
     seen = set(item["id"] for item in chain)
     for item in chain:

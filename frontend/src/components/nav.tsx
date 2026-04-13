@@ -16,11 +16,13 @@ import {
   Orbit,
   Store,
   Brain,
+  Code2,
 } from "lucide-react";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/research", label: "Deep Research", icon: Brain },
+  { href: "/codegen", label: "Code Generator", icon: Code2 },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },

@@ -168,3 +168,24 @@ export interface ResearchChainResult {
   chain: RecordWithId[];
   memref_records: RecordWithId[];
 }
+
+// ── Code Generator Types ─────────────────────────────────────────────────────
+
+export interface CodegenResult {
+  prompt: string;
+  language: string;
+  plan: string;
+  code: string;
+  review: string;
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+}
+
+export interface CodegenChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}

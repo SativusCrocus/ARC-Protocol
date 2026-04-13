@@ -15,6 +15,8 @@ import type {
   DisputeData,
   ResearchResult,
   ResearchChainResult,
+  CodegenResult,
+  CodegenChainResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -149,4 +151,14 @@ export const api = {
 
   researchChain: (id: string) =>
     request<ResearchChainResult>(`/research/chain/${id}`),
+
+  // ── Code Generator ──────────────────────────────────────────────────────
+  codegen: (data: { prompt: string; language?: string; model?: string }) =>
+    request<CodegenResult>("/codegen", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  codegenChain: (id: string) =>
+    request<CodegenChainResult>(`/codegen/chain/${id}`),
 };
