@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .venv/
 *.db
+!backend/seed.db
 .arc/
 
 node_modules/
