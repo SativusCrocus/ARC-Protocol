@@ -35,6 +35,8 @@ const filterTabs = [
   { key: "settlement", label: "Settlements" },
 ];
 
+const AGENT_PALETTE = ["#F7931A", "#00F0FF", "#22c55e", "#a855f7", "#f43f5e", "#eab308"];
+
 const CERTIFIED_AGENTS = [
   {
     id: "research",
@@ -43,6 +45,7 @@ const CERTIFIED_AGENTS = [
     icon: Brain,
     color: "#A855F7",
     desc: "LangGraph pipeline \u2014 plan \u2192 research \u2192 analyze \u2192 synthesize \u2192 inscribe",
+    aliases: ["arc-deep-research", "arc-research", "arc-synthesis", "arc-composer"],
     keywords: ["research", "synthesi", "deep research"],
   },
   {
@@ -52,6 +55,7 @@ const CERTIFIED_AGENTS = [
     icon: Code2,
     color: "#00F0FF",
     desc: "Multi-language generation with architecture plan + code review",
+    aliases: ["arc-codegen"],
     keywords: ["codegen", "code gen", "code review", "generate code"],
   },
   {
@@ -61,14 +65,20 @@ const CERTIFIED_AGENTS = [
     icon: TrendingUp,
     color: "#22c55e",
     desc: "Market analysis, signal generation, and Lightning settlement",
+    aliases: ["arc-defi-trader"],
     keywords: ["trader", "trade signal", "market scan", "defi", "risk assess"],
   },
 ];
 
 function detectAgentType(alias?: string, actions?: string[]) {
-  const text = [alias || "", ...(actions || [])].join(" ").toLowerCase();
+  const a = (alias || "").toLowerCase();
+  const byAlias = CERTIFIED_AGENTS.find((ca) =>
+    ca.aliases.some((al) => a === al)
+  );
+  if (byAlias) return byAlias;
+  const text = [a, ...(actions || [])].join(" ").toLowerCase();
   return (
-    CERTIFIED_AGENTS.find((a) => a.keywords.some((k) => text.includes(k))) ||
+    CERTIFIED_AGENTS.find((ca) => ca.keywords.some((k) => text.includes(k))) ||
     null
   );
 }
@@ -144,13 +154,13 @@ export default function Dashboard() {
   const certifiedStats = CERTIFIED_AGENTS.map((agent) => {
     const matchingRecords =
       records?.filter((r) => {
-        const text = [
-          r.record.agent.alias || "",
-          r.record.action,
-        ]
-          .join(" ")
-          .toLowerCase();
-        return agent.keywords.some((k) => text.includes(k));
+        const alias = (r.record.agent.alias || "").toLowerCase();
+        if (agent.aliases.some((a) => alias === a)) return true;
+        const belongsToOther = CERTIFIED_AGENTS.some(
+          (other) => other.id !== agent.id && other.aliases.some((a) => alias === a)
+        );
+        if (belongsToOther) return false;
+        return agent.keywords.some((k) => r.record.action.toLowerCase().includes(k));
       }) || [];
     return {
       ...agent,
@@ -633,7 +643,7 @@ export default function Dashboard() {
                     agent.alias,
                     agent.actions
                   );
-                  const barColor = agentType?.color || "#F7931A";
+                  const dotColor = agentType?.color || AGENT_PALETTE[i % AGENT_PALETTE.length];
                   return (
                     <Link
                       key={agent.pubkey}
@@ -646,15 +656,13 @@ export default function Dashboard() {
                       <span className="text-[10px] font-mono text-white/15 w-4">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      {agentType && (
-                        <div
-                          className="h-2 w-2 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: agentType.color,
-                            boxShadow: `0 0 6px ${agentType.color}50`,
-                          }}
-                        />
-                      )}
+                      <div
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: dotColor,
+                          boxShadow: `0 0 6px ${dotColor}50`,
+                        }}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-white/60 group-hover:text-white truncate transition-colors">
                           {agentType?.name ||
@@ -673,7 +681,7 @@ export default function Dashboard() {
                         <motion.div
                           className="h-full rounded-full"
                           style={{
-                            background: `linear-gradient(to right, ${barColor}99, ${barColor}4D)`,
+                            background: `linear-gradient(to right, ${dotColor}99, ${dotColor}4D)`,
                           }}
                           initial={{ width: 0 }}
                           animate={{
