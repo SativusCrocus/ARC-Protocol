@@ -22,6 +22,10 @@ import {
   Loader2,
   Play,
   Rocket,
+  Brain,
+  Code2,
+  Shield,
+  Link2,
 } from "lucide-react";
 
 const filterTabs = [
@@ -31,12 +35,51 @@ const filterTabs = [
   { key: "settlement", label: "Settlements" },
 ];
 
+const CERTIFIED_AGENTS = [
+  {
+    id: "research",
+    name: "Deep Research",
+    href: "/research",
+    icon: Brain,
+    color: "#A855F7",
+    desc: "LangGraph pipeline \u2014 plan \u2192 research \u2192 analyze \u2192 synthesize \u2192 inscribe",
+    keywords: ["research", "synthesiz", "deep research"],
+  },
+  {
+    id: "codegen",
+    name: "Code Generator",
+    href: "/codegen",
+    icon: Code2,
+    color: "#00F0FF",
+    desc: "Multi-language generation with architecture plan + code review",
+    keywords: ["codegen", "code gen", "code review", "generate code"],
+  },
+  {
+    id: "trader",
+    name: "DeFi Trader",
+    href: "/trader",
+    icon: TrendingUp,
+    color: "#22c55e",
+    desc: "Market analysis, signal generation, and Lightning settlement",
+    keywords: ["trader", "trade signal", "market scan", "defi", "risk assess"],
+  },
+];
+
+function detectAgentType(alias?: string, actions?: string[]) {
+  const text = [alias || "", ...(actions || [])].join(" ").toLowerCase();
+  return (
+    CERTIFIED_AGENTS.find((a) => a.keywords.some((k) => text.includes(k))) ||
+    null
+  );
+}
+
 export default function Dashboard() {
   const [filter, setFilter] = useState("all");
 
   const { data: records, isLoading } = useQuery({
     queryKey: ["records"],
     queryFn: api.records,
+    refetchInterval: 10_000,
   });
 
   const stats = records
@@ -58,12 +101,19 @@ export default function Dashboard() {
     (r) => filter === "all" || r.record.type === filter
   );
 
-  const agentRanking = records
+  const agentMap = records
     ? Object.values(
         records.reduce<
           Record<
             string,
-            { pubkey: string; alias?: string; count: number; sats: number }
+            {
+              pubkey: string;
+              alias?: string;
+              count: number;
+              sats: number;
+              memrefs: number;
+              actions: string[];
+            }
           >
         >((acc, { record }) => {
           const key = record.agent.pubkey;
@@ -73,16 +123,36 @@ export default function Dashboard() {
               alias: record.agent.alias,
               count: 0,
               sats: 0,
+              memrefs: 0,
+              actions: [],
             };
           }
           acc[key].count++;
           acc[key].sats += record.settlement?.amount_sats || 0;
+          acc[key].memrefs += record.memrefs.length;
+          if (acc[key].actions.length < 10)
+            acc[key].actions.push(record.action);
           return acc;
         }, {})
       )
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
     : [];
+
+  const agentRanking = [...agentMap]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const certifiedStats = CERTIFIED_AGENTS.map((agent) => {
+    const matching = agentMap.filter(
+      (a) => detectAgentType(a.alias, a.actions)?.id === agent.id
+    );
+    return {
+      ...agent,
+      records: matching.reduce((s, a) => s + a.count, 0),
+      sats: matching.reduce((s, a) => s + a.sats, 0),
+      memrefs: matching.reduce((s, a) => s + a.memrefs, 0),
+      active: matching.length > 0,
+    };
+  });
 
   const qc = useQueryClient();
 
@@ -222,6 +292,104 @@ export default function Dashboard() {
           </div>
         </motion.div>
       )}
+
+      {/* ARC Certified Agents */}
+      <div className="space-y-3 anim-fade-up anim-delay-1">
+        <div className="flex items-center gap-2">
+          <Shield className="h-3.5 w-3.5 text-[#F7931A]" />
+          <h3 className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
+            ARC Certified Agents
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {certifiedStats.map(
+            ({
+              id,
+              name,
+              href,
+              icon: Icon,
+              color,
+              desc,
+              records: count,
+              sats,
+              memrefs,
+              active,
+            }) => (
+              <Link key={id} href={href}>
+                <Card className="glow-card group hover:border-white/[0.12] transition-all duration-500 cursor-pointer h-full relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                    style={{
+                      background: `radial-gradient(ellipse at 50% 0%, ${color}08, transparent 70%)`,
+                    }}
+                  />
+                  <CardContent className="p-5 relative">
+                    <div className="flex items-start justify-between mb-3">
+                      <div
+                        className="p-2.5 rounded-xl border transition-all duration-300"
+                        style={{
+                          backgroundColor: `${color}08`,
+                          borderColor: `${color}15`,
+                        }}
+                      >
+                        <Icon
+                          className="h-5 w-5 transition-all duration-300 group-hover:scale-110"
+                          style={{ color }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {active && (
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className="h-1.5 w-1.5 rounded-full animate-breathe"
+                              style={{
+                                backgroundColor: color,
+                                boxShadow: `0 0 6px ${color}60`,
+                              }}
+                            />
+                            <span
+                              className="text-[10px] font-semibold tracking-wider"
+                              style={{ color }}
+                            >
+                              LIVE
+                            </span>
+                          </span>
+                        )}
+                        <ArrowUpRight className="h-4 w-4 text-white/10 group-hover:text-white/40 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
+                    </div>
+                    <h4 className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors mb-1">
+                      {name}
+                    </h4>
+                    <p className="text-[11px] text-white/20 leading-relaxed mb-3">
+                      {desc}
+                    </p>
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="font-mono text-white/30">
+                        {count} records
+                      </span>
+                      {sats > 0 && (
+                        <span className="font-mono text-emerald-400/60">
+                          {sats.toLocaleString()} sats
+                        </span>
+                      )}
+                      {memrefs > 0 && (
+                        <span
+                          className="flex items-center gap-1 font-mono"
+                          style={{ color: `${color}80` }}
+                        >
+                          <Link2 className="h-2.5 w-2.5" />
+                          {memrefs} refs
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          )}
+        </div>
+      </div>
 
       {/* Live Demos */}
       <div className="space-y-3 anim-fade-up anim-delay-2">
@@ -447,37 +615,66 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {agentRanking.length > 0 ? (
-                agentRanking.map((agent, i) => (
-                  <Link
-                    key={agent.pubkey}
-                    href={`/explorer?q=${agent.pubkey}`}
-                    className="flex items-center gap-3 group"
-                  >
-                    <span className="text-[10px] font-mono text-white/15 w-4">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-white/60 group-hover:text-white truncate transition-colors">
-                        {agent.alias || `${agent.pubkey.slice(0, 12)}...`}
-                      </p>
-                      <p className="text-[10px] text-white/15 font-mono">
-                        {agent.count} records
-                        {agent.sats > 0 &&
-                          ` \u00b7 ${agent.sats.toLocaleString()} sats`}
-                      </p>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-white/[0.04] w-14 overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full bg-gradient-to-r from-[#F7931A]/60 to-[#F7931A]/30"
-                        initial={{ width: 0 }}
-                        animate={{
-                          width: `${Math.min(100, (agent.count / (agentRanking[0]?.count || 1)) * 100)}%`,
-                        }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                      />
-                    </div>
-                  </Link>
-                ))
+                agentRanking.map((agent, i) => {
+                  const agentType = detectAgentType(
+                    agent.alias,
+                    agent.actions
+                  );
+                  const barColor = agentType?.color || "#F7931A";
+                  return (
+                    <Link
+                      key={agent.pubkey}
+                      href={
+                        agentType?.href ||
+                        `/explorer?q=${agent.pubkey}`
+                      }
+                      className="flex items-center gap-3 group"
+                    >
+                      <span className="text-[10px] font-mono text-white/15 w-4">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      {agentType && (
+                        <div
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: agentType.color,
+                            boxShadow: `0 0 6px ${agentType.color}50`,
+                          }}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white/60 group-hover:text-white truncate transition-colors">
+                          {agentType?.name ||
+                            agent.alias ||
+                            `${agent.pubkey.slice(0, 12)}...`}
+                        </p>
+                        <p className="text-[10px] text-white/15 font-mono">
+                          {agent.count} records
+                          {agent.sats > 0 &&
+                            ` \u00b7 ${agent.sats.toLocaleString()} sats`}
+                          {agent.memrefs > 0 &&
+                            ` \u00b7 ${agent.memrefs} refs`}
+                        </p>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/[0.04] w-14 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{
+                            background: `linear-gradient(to right, ${barColor}99, ${barColor}4D)`,
+                          }}
+                          initial={{ width: 0 }}
+                          animate={{
+                            width: `${Math.min(100, (agent.count / (agentRanking[0]?.count || 1)) * 100)}%`,
+                          }}
+                          transition={{
+                            duration: 0.8,
+                            ease: "easeOut",
+                          }}
+                        />
+                      </div>
+                    </Link>
+                  );
+                })
               ) : (
                 <p className="text-xs text-white/15 text-center py-4">
                   No agents yet

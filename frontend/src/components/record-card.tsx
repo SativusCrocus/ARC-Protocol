@@ -37,6 +37,12 @@ export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
 
           <Badge className={style.badge}>{record.type}</Badge>
 
+          {record.agent.alias && (
+            <span className="text-[10px] text-white/20 font-mono shrink-0 hidden sm:inline">
+              {record.agent.alias}
+            </span>
+          )}
+
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white/80 truncate group-hover:text-white transition-colors">
               {record.action}
@@ -45,6 +51,13 @@ export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
               {id.slice(0, 24)}&hellip;
             </p>
           </div>
+
+          {record.memrefs.length > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-[#F7931A]/40 shrink-0 font-mono">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#F7931A]/40 shadow-[0_0_4px_rgba(247,147,26,0.3)]" />
+              {record.memrefs.length}
+            </span>
+          )}
 
           <div className="text-right shrink-0">
             <p className="text-[11px] text-white/25">
