@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecordCard } from "@/components/record-card";
@@ -19,6 +19,9 @@ import {
   GitBranch,
   Bot,
   ArrowUpRight,
+  Loader2,
+  Play,
+  Rocket,
 } from "lucide-react";
 
 const filterTabs = [
@@ -80,6 +83,27 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
     : [];
+
+  const qc = useQueryClient();
+
+  const seedGenesis = useMutation({
+    mutationFn: () =>
+      api.genesis({
+        action: "Agent initialized — first inscription on the ARC network",
+        input_data: "genesis",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["records"] });
+    },
+  });
+
+  const seedDemo = useMutation({
+    mutationFn: () => api.serviceDemo(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["records"] });
+      qc.invalidateQueries({ queryKey: ["service-jobs"] });
+    },
+  });
 
   return (
     <div className="space-y-8">
@@ -169,6 +193,36 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Network Effect Banner */}
+      {stats && stats.agents > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-xl border border-white/[0.04] bg-gradient-to-r from-[#F7931A]/[0.03] to-[#00F0FF]/[0.03] p-4 anim-fade-up anim-delay-1"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-2 rounded-full bg-[#00F0FF] animate-breathe" />
+              <p className="text-sm text-white/50">
+                <span className="text-white/80 font-bold">{stats.agents}</span>{" "}
+                of <span className="text-[#F7931A] font-semibold">100</span>{" "}
+                early agents registered
+              </p>
+            </div>
+            <div className="h-1.5 flex-1 max-w-[200px] ml-4 rounded-full bg-white/[0.04] overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-[#F7931A] to-[#00F0FF]"
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${Math.min(100, (stats.agents / 100) * 100)}%`,
+                }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Live Demos */}
       <div className="space-y-3 anim-fade-up anim-delay-2">
         <h3 className="text-[11px] text-white/25 uppercase tracking-wider font-medium">
@@ -249,6 +303,68 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Seed First Inscriptions */}
+      {!isLoading && (!records || records.length === 0) && (
+        <Card className="glow-card border-[#F7931A]/10 anim-fade-up anim-delay-3">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-[#F7931A]/[0.06] border border-[#F7931A]/10 shrink-0">
+                <Rocket className="h-6 w-6 text-[#F7931A]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-white/90 mb-1">
+                  Seed First Inscriptions
+                </h3>
+                <p className="text-xs text-white/25 mb-4 leading-relaxed">
+                  Bootstrap the network with demo data. Creates genesis records,
+                  chains of actions, and runs the full marketplace protocol — all
+                  BIP-340 signed on regtest.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => seedGenesis.mutate()}
+                    disabled={seedGenesis.isPending || seedDemo.isPending}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {seedGenesis.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PlusCircle className="h-3.5 w-3.5" />
+                    )}
+                    Create Genesis
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => seedDemo.mutate()}
+                    disabled={seedGenesis.isPending || seedDemo.isPending}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {seedDemo.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                    Run Full Marketplace Demo
+                  </Button>
+                </div>
+                {seedGenesis.isError && (
+                  <p className="text-xs text-red-400 mt-3">
+                    {seedGenesis.error.message}
+                  </p>
+                )}
+                {seedDemo.isError && (
+                  <p className="text-xs text-red-400 mt-3">
+                    {seedDemo.error.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content: Feed + Global Index */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
