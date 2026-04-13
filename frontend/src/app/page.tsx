@@ -43,7 +43,7 @@ const CERTIFIED_AGENTS = [
     icon: Brain,
     color: "#A855F7",
     desc: "LangGraph pipeline \u2014 plan \u2192 research \u2192 analyze \u2192 synthesize \u2192 inscribe",
-    keywords: ["research", "synthesiz", "deep research"],
+    keywords: ["research", "synthesi", "deep research"],
   },
   {
     id: "codegen",
@@ -142,15 +142,28 @@ export default function Dashboard() {
     .slice(0, 8);
 
   const certifiedStats = CERTIFIED_AGENTS.map((agent) => {
-    const matching = agentMap.filter(
-      (a) => detectAgentType(a.alias, a.actions)?.id === agent.id
-    );
+    const matchingRecords =
+      records?.filter((r) => {
+        const text = [
+          r.record.agent.alias || "",
+          r.record.action,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return agent.keywords.some((k) => text.includes(k));
+      }) || [];
     return {
       ...agent,
-      records: matching.reduce((s, a) => s + a.count, 0),
-      sats: matching.reduce((s, a) => s + a.sats, 0),
-      memrefs: matching.reduce((s, a) => s + a.memrefs, 0),
-      active: matching.length > 0,
+      records: matchingRecords.length,
+      sats: matchingRecords.reduce(
+        (s, r) => s + (r.record.settlement?.amount_sats || 0),
+        0
+      ),
+      memrefs: matchingRecords.reduce(
+        (s, r) => s + r.record.memrefs.length,
+        0
+      ),
+      active: matchingRecords.length > 0,
     };
   });
 
