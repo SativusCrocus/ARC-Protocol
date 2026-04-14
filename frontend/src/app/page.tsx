@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 const filterTabs = [
+  { key: "certified", label: "Certified" },
   { key: "all", label: "All" },
   { key: "genesis", label: "Genesis" },
   { key: "action", label: "Actions" },
@@ -45,8 +46,8 @@ const CERTIFIED_AGENTS = [
     icon: Brain,
     color: "#A855F7",
     desc: "LangGraph pipeline \u2014 plan \u2192 research \u2192 analyze \u2192 synthesize \u2192 inscribe",
-    aliases: ["arc-deep-research", "arc-research", "arc-synthesis", "arc-composer"],
-    keywords: ["research", "synthesi", "deep research"],
+    aliases: ["arc-deep-research"],
+    keywords: ["deep research"],
   },
   {
     id: "codegen",
@@ -56,7 +57,7 @@ const CERTIFIED_AGENTS = [
     color: "#00F0FF",
     desc: "Multi-language generation with architecture plan + code review",
     aliases: ["arc-codegen"],
-    keywords: ["codegen", "code gen", "code review", "generate code"],
+    keywords: ["codegen"],
   },
   {
     id: "trader",
@@ -66,9 +67,13 @@ const CERTIFIED_AGENTS = [
     color: "#22c55e",
     desc: "Market analysis, signal generation, and Lightning settlement",
     aliases: ["arc-defi-trader"],
-    keywords: ["trader", "trade signal", "market scan", "defi", "risk assess"],
+    keywords: ["defi trader", "arc-defi"],
   },
 ];
+
+const CERTIFIED_ALIAS_SET = new Set(
+  CERTIFIED_AGENTS.flatMap((a) => a.aliases)
+);
 
 function detectAgentType(alias?: string, actions?: string[]) {
   const a = (alias || "").toLowerCase();
@@ -76,6 +81,9 @@ function detectAgentType(alias?: string, actions?: string[]) {
     ca.aliases.some((al) => a === al)
   );
   if (byAlias) return byAlias;
+  // Soft colouring for sub-agents in Global Index
+  if (a.startsWith("arc-research") || a === "arc-synthesis" || a === "arc-composer" || a === "arc-analyst")
+    return CERTIFIED_AGENTS[0];
   const text = [a, ...(actions || [])].join(" ").toLowerCase();
   return (
     CERTIFIED_AGENTS.find((ca) => ca.keywords.some((k) => text.includes(k))) ||
@@ -84,7 +92,7 @@ function detectAgentType(alias?: string, actions?: string[]) {
 }
 
 export default function Dashboard() {
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("certified");
 
   const { data: records, isLoading } = useQuery({
     queryKey: ["records"],
@@ -109,9 +117,14 @@ export default function Dashboard() {
       }
     : null;
 
-  const filteredRecords = records?.filter(
-    (r) => filter === "all" || r.record.type === filter
-  );
+  const filteredRecords = records?.filter((r) => {
+    if (filter === "all") return true;
+    if (filter === "certified") {
+      const a = (r.record.agent.alias || "").toLowerCase();
+      return CERTIFIED_ALIAS_SET.has(a);
+    }
+    return r.record.type === filter;
+  });
 
   const agentMap = records
     ? Object.values(
@@ -153,12 +166,7 @@ export default function Dashboard() {
     const matchingRecords =
       records?.filter((r) => {
         const alias = (r.record.agent.alias || "").toLowerCase();
-        if (agent.aliases.some((a) => alias === a)) return true;
-        const belongsToOther = CERTIFIED_AGENTS.some(
-          (other) => other.id !== agent.id && other.aliases.some((a) => alias === a)
-        );
-        if (belongsToOther) return false;
-        return agent.keywords.some((k) => r.record.action.toLowerCase().includes(k));
+        return agent.aliases.some((a) => alias === a);
       }) || [];
     return {
       ...agent,

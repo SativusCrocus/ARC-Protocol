@@ -828,15 +828,31 @@ _SEED_AGENTS = [
 
 
 def seed_production_db():
-    """Seed production DB with all certified agent records on first run."""
+    """Seed production DB with any missing certified agent records on startup.
+
+    Per-alias idempotent: if an alias already has records, skip it; otherwise
+    insert its full seed bundle. This lets new certified agents (codegen,
+    trader, etc.) appear on the next deploy even if the DB was previously
+    seeded with only a subset.
+    """
     db = arc.get_db()
-    if db.execute("SELECT COUNT(*) FROM records").fetchone()[0] >= 20:
-        return
+
+    existing_aliases: set[str] = set()
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT json_extract(data, '$.agent.alias') FROM records"
+        ).fetchall()
+        existing_aliases = {r[0] for r in rows if r[0]}
+    except Exception:
+        existing_aliases = set()
 
     all_ids: dict[str, list[str]] = {}
 
     for cfg in _SEED_AGENTS:
         alias = cfg["alias"]
+        if alias in existing_aliases:
+            continue
+
         key_file = arc.KEYS_DIR / f"{alias}.key"
         if key_file.exists():
             secret = bytes.fromhex(key_file.read_text().strip())
