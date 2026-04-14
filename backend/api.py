@@ -3,13 +3,17 @@ Security: rate limiting, strict Pydantic validation, Schnorr re-verification.
 Private keys never touch the API transport layer.
 """
 
+import logging
 import os
 import re
+import sys
+import traceback
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -20,6 +24,15 @@ import marketplace as mkt
 import research_agent as ra
 import codegen_agent as cg
 import trader_agent as ta
+
+# Structured logging so Vercel/Railway surface tracebacks instead of
+# a bare "Internal Server Error" with no detail.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("arc.api")
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -39,6 +52,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global exception handler — log full traceback and return structured JSON
+# so production 500s are debuggable instead of opaque.
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        # Let FastAPI's default HTTPException handling pass through.
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+    tb = traceback.format_exc()
+    log.error(
+        "Unhandled exception on %s %s: %s\n%s",
+        request.method, request.url.path, exc, tb,
+    )
+    # ARC_DEBUG=1 exposes the traceback in the response body for triage.
+    # Off by default to avoid leaking internals.
+    body: dict = {
+        "detail": "Internal Server Error",
+        "error_type": type(exc).__name__,
+        "error": str(exc),
+        "path": request.url.path,
+    }
+    if os.environ.get("ARC_DEBUG") == "1":
+        body["traceback"] = tb
+    return JSONResponse(status_code=500, content=body)
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -131,7 +172,60 @@ def _validate_hex_id(record_id: str) -> None:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "arc_version": arc.ARC_VERSION}
+    """Liveness + runtime introspection.
+
+    Reports the resolved ARC_DIR, whether the DB is reachable, and how many
+    records are currently stored. Safe to expose — no secrets.
+    """
+    info: dict = {
+        "status": "ok",
+        "arc_version": arc.ARC_VERSION,
+        "arc_dir": str(arc.ARC_DIR),
+        "db_path": str(arc.DB_PATH),
+    }
+    try:
+        db = arc.get_db()
+        row = db.execute("SELECT COUNT(*) FROM records").fetchone()
+        info["record_count"] = int(row[0]) if row else 0
+        info["db_ok"] = True
+    except Exception as e:  # noqa: BLE001
+        info["db_ok"] = False
+        info["db_error"] = f"{type(e).__name__}: {e}"
+    try:
+        info["keys_count"] = len(list(arc.KEYS_DIR.glob("*.key")))
+    except Exception:
+        info["keys_count"] = None
+    return info
+
+
+@app.post("/debug/seed")
+def debug_reseed():
+    """Force a (re-)seed attempt. Useful after a cold start on ephemeral
+    filesystems (Vercel). Returns per-agent record counts after seeding.
+    """
+    try:
+        seed_production_db()
+    except Exception as e:  # noqa: BLE001
+        tb = traceback.format_exc()
+        log.error("debug_reseed failed: %s\n%s", e, tb)
+        raise HTTPException(500, f"Seed failed: {type(e).__name__}: {e}")
+    db = arc.get_db()
+    counts: dict[str, int] = {}
+    try:
+        rows = db.execute(
+            "SELECT json_extract(data,'$.agent.alias') AS a, COUNT(*) "
+            "FROM records GROUP BY a"
+        ).fetchall()
+        counts = {(r[0] or "<unaliased>"): int(r[1]) for r in rows}
+    except Exception as e:  # noqa: BLE001
+        counts = {"_error": f"{type(e).__name__}: {e}"}
+    total_row = db.execute("SELECT COUNT(*) FROM records").fetchone()
+    return {
+        "ok": True,
+        "arc_dir": str(arc.ARC_DIR),
+        "total": int(total_row[0]) if total_row else 0,
+        "by_alias": counts,
+    }
 
 
 @app.post("/keygen")
@@ -955,19 +1049,17 @@ def seed_production_db():
 def _startup_seed():
     try:
         seed_production_db()
-        print("[seed] seed_production_db completed", flush=True)
-    except Exception as e:
-        import traceback
-        print(f"[seed] ERROR: {e}", flush=True)
-        traceback.print_exc()
+        log.info("startup seed_production_db completed (arc_dir=%s)", arc.ARC_DIR)
+    except Exception as e:  # noqa: BLE001
+        log.error("startup seed failed: %s\n%s", e, traceback.format_exc())
 
 
 # Also run at import time so seeding happens even if the startup event
 # is not fired (defensive against FastAPI deprecations / lifespan migration).
+# This MUST NEVER raise — a broken seed cannot be allowed to prevent the
+# app module from loading, or every route (including /health) would 500.
 try:
     seed_production_db()
-    print("[seed] import-time seed_production_db completed", flush=True)
-except Exception as _e:
-    import traceback as _tb
-    print(f"[seed] import-time ERROR: {_e}", flush=True)
-    _tb.print_exc()
+    log.info("import-time seed_production_db completed (arc_dir=%s)", arc.ARC_DIR)
+except Exception as _e:  # noqa: BLE001
+    log.error("import-time seed failed: %s\n%s", _e, traceback.format_exc())

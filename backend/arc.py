@@ -18,9 +18,48 @@ from ecdsa import SECP256k1
 from ecdsa.ellipticcurve import PointJacobi
 
 ARC_VERSION = "1.0"
-ARC_DIR = Path.home() / ".arc"
+
+
+def _resolve_arc_dir() -> Path:
+    """Pick a writable directory for ARC state.
+
+    Precedence:
+      1. ARC_HOME env var (deploys set this explicitly).
+      2. ~/.arc  if the home dir is writable.
+      3. /tmp/.arc as a last-resort ephemeral fallback (Vercel serverless,
+         read-only root filesystems, etc.).
+    """
+    candidates: list[Path] = []
+    env = os.environ.get("ARC_HOME")
+    if env:
+        candidates.append(Path(env))
+    try:
+        candidates.append(Path.home() / ".arc")
+    except Exception:
+        pass
+    candidates.append(Path("/tmp") / ".arc")
+
+    for cand in candidates:
+        try:
+            cand.mkdir(parents=True, exist_ok=True)
+            # Writability probe — catches read-only filesystems that still
+            # let mkdir succeed (rare, but real on some serverless runtimes).
+            probe = cand / ".write-probe"
+            probe.write_text("ok")
+            probe.unlink()
+            return cand
+        except Exception as e:  # noqa: BLE001
+            print(f"[arc] ARC_DIR candidate unusable: {cand} ({e})", flush=True)
+            continue
+    # Absolute fallback — return the tmp path even if the probe failed;
+    # downstream code will surface a clear error instead of an import crash.
+    return Path("/tmp") / ".arc"
+
+
+ARC_DIR = _resolve_arc_dir()
 DB_PATH = ARC_DIR / "records.db"
 KEYS_DIR = ARC_DIR / "keys"
+print(f"[arc] ARC_DIR resolved to {ARC_DIR}", flush=True)
 
 # ── BIP-340 Schnorr (pure Python) ──────────────────────────────────────────
 
@@ -134,8 +173,8 @@ def verify_sig(record: dict) -> bool:
 
 
 def ensure_dirs():
-    ARC_DIR.mkdir(exist_ok=True)
-    KEYS_DIR.mkdir(exist_ok=True)
+    ARC_DIR.mkdir(parents=True, exist_ok=True)
+    KEYS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_db() -> sqlite3.Connection:
