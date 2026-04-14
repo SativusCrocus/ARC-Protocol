@@ -219,3 +219,46 @@ export interface TraderChainResult {
   chain: RecordWithId[];
   memref_records: RecordWithId[];
 }
+
+// ── Legal Contracts Agent Types ─────────────────────────────────────────────
+
+export interface LegalTemplate {
+  key: string;
+  name: string;
+  preamble: string;
+  clauses: string[];
+}
+
+export interface LegalResult {
+  prompt: string;
+  template: string;
+  template_name: string;
+  parties: string;
+  jurisdiction: string;
+  draft: string;
+  clauses: string;
+  compliance: string;
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface LegalChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface LegalVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

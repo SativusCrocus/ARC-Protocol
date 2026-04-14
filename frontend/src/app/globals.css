@@ -387,3 +387,59 @@
 .codegen-btn-glow:hover:not(:disabled) {
   box-shadow: 0 0 20px rgba(168, 85, 247, 0.35);
 }
+
+/* ── Legal Contracts Styles ─────────────────────────────────────────── */
+
+.text-glow-gold {
+  text-shadow:
+    0 0 40px rgba(234, 179, 8, 0.35),
+    0 0 80px rgba(234, 179, 8, 0.12);
+}
+
+.legal-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(234, 179, 8, 0.02),
+    0 0 60px rgba(234, 179, 8, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.legal-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(234, 179, 8, 0.04),
+    0 0 80px rgba(234, 179, 8, 0.05);
+}
+
+.legal-dag-glow {
+  box-shadow:
+    0 0 40px rgba(234, 179, 8, 0.06),
+    inset 0 0 40px rgba(234, 179, 8, 0.02);
+  animation: legal-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes legal-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(234, 179, 8, 0.06),
+      inset 0 0 40px rgba(234, 179, 8, 0.02);
+  }
+  50% {
+    box-shadow:
+      0 0 70px rgba(234, 179, 8, 0.10),
+      inset 0 0 60px rgba(234, 179, 8, 0.05);
+  }
+}
+
+.legal-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.legal-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(234, 179, 8, 0.40);
+}
+
+.legal-contract-paper {
+  background:
+    linear-gradient(to bottom,
+      rgba(234, 179, 8, 0.025) 0%,
+      rgba(234, 179, 8, 0.008) 50%,
+      transparent 100%);
+  border-left: 2px solid rgba(234, 179, 8, 0.25);
+}

@@ -18,6 +18,7 @@ import {
   Brain,
   Code2,
   TrendingUp,
+  Scale,
 } from "lucide-react";
 
 const links = [
@@ -25,6 +26,7 @@ const links = [
   { href: "/research", label: "Deep Research", icon: Brain },
   { href: "/codegen", label: "Code Generator", icon: Code2 },
   { href: "/trader", label: "DeFi Trader", icon: TrendingUp },
+  { href: "/legal", label: "Legal Contracts", icon: Scale },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },

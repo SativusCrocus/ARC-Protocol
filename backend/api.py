@@ -24,6 +24,7 @@ import marketplace as mkt
 import research_agent as ra
 import codegen_agent as cg
 import trader_agent as ta
+import legal_agent as la
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -830,6 +831,108 @@ def trader_chain(request: Request, record_id: str):
     return {"chain": chain, "memref_records": memref_records}
 
 
+# ── Legal Contracts Agent ────────────────────────────────────────────────────
+
+
+SUPPORTED_TEMPLATES = {"nda", "service", "license", "custom"}
+
+
+class LegalReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    template: str = Field("custom", max_length=32)
+    parties: str = Field("", max_length=512)
+    jurisdiction: str = Field("Delaware, USA", max_length=128)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("template")
+    @classmethod
+    def validate_template(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_TEMPLATES:
+            raise ValueError(
+                f"template must be one of: {', '.join(sorted(SUPPORTED_TEMPLATES))}"
+            )
+        return v
+
+
+@app.get("/legal/templates")
+@limiter.limit("60/minute")
+def legal_templates(request: Request):
+    """Return the available legal contract templates."""
+    return {"templates": la.list_templates()}
+
+
+@app.post("/legal")
+@limiter.limit("5/minute")
+def legal(request: Request, req: LegalReq):
+    """Run LangGraph legal contracts agent with cross-agent ARC inscriptions."""
+    try:
+        return la.run_legal(
+            prompt=req.prompt,
+            template=req.template,
+            parties=req.parties,
+            jurisdiction=req.jurisdiction,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Legal agent error: {str(e)}")
+
+
+@app.get("/legal/chain/{record_id}")
+@limiter.limit("60/minute")
+def legal_chain(request: Request, record_id: str):
+    """Fetch the full legal contract chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/legal/verify/{record_id}")
+@limiter.limit("60/minute")
+def legal_verify(request: Request, record_id: str):
+    """Deep-verify a legal contract record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -971,6 +1074,25 @@ _SEED_AGENTS = [
             "Watchtower: Schnorr signature batch verification passed",
         ],
         "settlements": [("Watchtower subscription: breach-protection standby", 2500)],
+    },
+    {
+        "alias": "arc-legal",
+        "genesis": "Legal Contracts agent initialized \u2014 LangGraph + Ollama + ARC cross-agent anchoring",
+        "actions": [
+            "Legal draft (Mutual NDA): AI research lab \u2194 Bitcoin L2 startup \u2014 joint inference work",
+            "Clause review: NDA confidentiality term + ARC provenance anchors",
+            "Compliance memo: Delaware, USA \u2014 ESIGN Act + eIDAS validity for ARC-signed records",
+            "Legal draft (Service Agreement): DeFi trader signal subscription \u2014 Lightning-settled fees",
+            "Clause review: milestone acceptance + ARC Memory DAG dispute-resolution clause",
+            "Compliance memo: New York, USA \u2014 money transmitter analysis for sat-denominated fees",
+            "Legal draft (License Agreement): Codegen agent output \u2014 royalty-metered via ARC inscriptions",
+            "Clause review: audit rights verified against on-chain ARC chain hash",
+            "Legal contract finalized (NDA): cross-agent memref anchor to Research + Codegen + Trader",
+        ],
+        "settlements": [
+            ("Legal drafting service: NDA package \u2014 ARC-anchored", 15000),
+            ("Legal drafting service: Service Agreement + compliance memo", 22000),
+        ],
     },
 ]
 

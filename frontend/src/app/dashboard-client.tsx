@@ -27,6 +27,7 @@ import {
   Code2,
   Shield,
   Link2,
+  Scale,
 } from "lucide-react";
 
 const filterTabs = [
@@ -69,6 +70,16 @@ const CERTIFIED_AGENTS = [
     desc: "Market analysis, signal generation, and Lightning settlement",
     aliases: ["arc-defi-trader"],
     keywords: ["defi trader", "arc-defi"],
+  },
+  {
+    id: "legal",
+    name: "Legal Contracts",
+    href: "/legal",
+    icon: Scale,
+    color: "#EAB308",
+    desc: "NDA / Service / License drafting \u2014 cross-agent memrefs + compliance",
+    aliases: ["arc-legal"],
+    keywords: ["legal", "arc-legal", "contract"],
   },
 ];
 
@@ -385,7 +396,7 @@ export function Dashboard({
             ARC Certified Agents
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {certifiedStats.map(
             ({
               id,

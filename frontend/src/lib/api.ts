@@ -19,6 +19,10 @@ import type {
   CodegenChainResult,
   TraderResult,
   TraderChainResult,
+  LegalResult,
+  LegalChainResult,
+  LegalTemplate,
+  LegalVerifyResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -181,4 +185,26 @@ export const api = {
 
   traderChain: (id: string) =>
     request<TraderChainResult>(`/trader/chain/${id}`),
+
+  // ── Legal Contracts ──────────────────────────────────────────────────────
+  legalTemplates: () =>
+    request<{ templates: LegalTemplate[] }>("/legal/templates"),
+
+  legal: (data: {
+    prompt: string;
+    template?: string;
+    parties?: string;
+    jurisdiction?: string;
+    model?: string;
+  }) =>
+    request<LegalResult>("/legal", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  legalChain: (id: string) =>
+    request<LegalChainResult>(`/legal/chain/${id}`),
+
+  legalVerify: (id: string) =>
+    request<LegalVerifyResult>(`/legal/verify/${id}`),
 };

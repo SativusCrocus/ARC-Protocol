@@ -5,12 +5,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // Bulletproof floor: used if backend is unreachable at SSR time.
-// Matches the per-alias idempotent seed in backend/api.py.
+// Matches the per-alias idempotent seed in backend/api.py — now includes
+// the arc-legal agent (+1 genesis, +9 actions, +2 settlements = 12 records).
 const FALLBACK_STATS: InitialStats = {
-  total: 81,
-  agents: 13,
-  actions: 62,
-  totalSats: 33000,
+  total: 93,
+  agents: 14,
+  actions: 71,
+  totalSats: 70000,
 };
 
 function getBackendUrl(): string {
