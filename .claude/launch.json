@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd backend && .venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000"],
-      "port": 8000
+      "runtimeExecutable": "/Users/bcode/Downloads/ARC Protocol/backend/.venv/bin/uvicorn",
+      "runtimeArgs": ["api:app", "--host", "0.0.0.0", "--port", "8000"],
+      "port": 8000,
+      "cwd": "backend"
     },
     {
       "name": "frontend",
@@ -13,6 +14,16 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "cwd": "frontend"
+    },
+    {
+      "name": "frontend-prod-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "frontend",
+      "env": {
+        "NEXT_PUBLIC_API_URL": "https://arc-protocol-production.up.railway.app"
+      }
     }
   ]
 }
