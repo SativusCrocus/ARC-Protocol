@@ -27,6 +27,7 @@ import trader_agent as ta
 import legal_agent as la
 import design_agent as da
 import support_agent as sa
+import compliance_agent as coa
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -1165,6 +1166,123 @@ def support_verify(request: Request, record_id: str):
     }
 
 
+# ── Compliance & Audit Agent ────────────────────────────────────────────────
+
+
+SUPPORTED_COMPLIANCE_TYPES = {
+    "regulatory", "safety", "provenance", "hallucination", "bias",
+}
+SUPPORTED_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+
+class ComplianceReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    compliance_type: str = Field("regulatory", max_length=32)
+    subject: str = Field("", max_length=128)
+    severity: str = Field("MEDIUM", max_length=16)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("compliance_type")
+    @classmethod
+    def validate_ctype(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_COMPLIANCE_TYPES:
+            raise ValueError(
+                f"compliance_type must be one of: "
+                f"{', '.join(sorted(SUPPORTED_COMPLIANCE_TYPES))}"
+            )
+        return v
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        v = v.upper()
+        if v not in SUPPORTED_SEVERITIES:
+            raise ValueError(
+                f"severity must be one of: "
+                f"{', '.join(sorted(SUPPORTED_SEVERITIES))}"
+            )
+        return v
+
+
+@app.get("/compliance/types")
+@limiter.limit("60/minute")
+def compliance_types(request: Request):
+    """Return the available compliance audit types + control sets."""
+    return {"types": coa.list_compliance_types()}
+
+
+@app.post("/compliance")
+@limiter.limit("5/minute")
+def compliance(request: Request, req: ComplianceReq):
+    """Run LangGraph compliance & audit agent with cross-agent ARC inscriptions."""
+    try:
+        return coa.run_compliance(
+            prompt=req.prompt,
+            compliance_type=req.compliance_type,
+            subject=req.subject,
+            severity=req.severity,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Compliance agent error: {str(e)}")
+
+
+@app.get("/compliance/chain/{record_id}")
+@limiter.limit("60/minute")
+def compliance_chain(request: Request, record_id: str):
+    """Fetch the full compliance audit chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/compliance/verify/{record_id}")
+@limiter.limit("60/minute")
+def compliance_verify(request: Request, record_id: str):
+    """Deep-verify a compliance record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -1375,6 +1493,37 @@ _SEED_AGENTS = [
             ("Support tier: Billing reconciliation service \u2014 ARC-anchored", 4500),
             ("Support tier: Technical hotfix intake \u2014 ARC-anchored", 6500),
             ("Support tier: Dispute mediation \u2014 cross-agent memref package", 11000),
+        ],
+    },
+    {
+        "alias": "arc-compliance",
+        "genesis": "Compliance & Audit agent initialized \u2014 LangGraph + Ollama + ARC cross-agent attestation mesh",
+        "actions": [
+            "Compliance scope (Regulatory): GDPR + MiCA posture across arc-deep-research + arc-legal",
+            "Compliance audit (Regulatory): data-subject rights + AML flags \u2014 DAG walk against arc-defi-trader",
+            "Compliance evidence bundle: regulator-ready memref citations across 6 agents",
+            "Compliance report draft (Regulatory): conditional pass \u2014 remediation queue anchored",
+            "Compliance audit inscribed (Regulatory): arc-legal + arc-defi-trader attestation",
+            "Compliance scope (Safety): OWASP LLM Top-10 against arc-codegen + arc-support",
+            "Compliance audit (Safety): jailbreak resilience + tool-use escalation \u2014 red-team pass",
+            "Compliance evidence bundle: safety scorecard + refusal-rate ledger",
+            "Compliance audit inscribed (Safety): arc-codegen + arc-support guardrail attestation",
+            "Compliance scope (Provenance): full certified-agent DAG walk \u2014 BIP-340 continuity check",
+            "Compliance audit (Provenance): prev chain + memref edges verified for all 6 agents",
+            "Compliance evidence bundle: chain-continuity witness + orphan-record sweep",
+            "Compliance audit inscribed (Provenance): zero-tamper attestation across the lattice",
+            "Compliance scope (Hallucination): factuality audit of arc-deep-research + arc-design",
+            "Compliance audit (Hallucination): cited-memref resolution + external-claim sweep",
+            "Compliance audit inscribed (Hallucination): claim-to-evidence delta ledger",
+            "Compliance scope (Bias): dispute + settlement skew across arc-defi-trader + arc-support",
+            "Compliance audit (Bias): demographic parity + drift vs. seed-era baseline",
+            "Compliance audit inscribed (Bias): fairness disclosure + remediation path",
+            "Compliance meta-audit: full-mesh attestation \u2014 cross-signed by all certified agents",
+        ],
+        "settlements": [
+            ("Compliance tier: Regulatory attestation bundle \u2014 ARC-anchored", 14500),
+            ("Compliance tier: Safety red-team pass \u2014 ARC-anchored", 9500),
+            ("Compliance tier: Full-mesh provenance audit \u2014 cross-agent package", 18500),
         ],
     },
 ]

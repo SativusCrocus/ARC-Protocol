@@ -103,6 +103,16 @@ const CERTIFIED_AGENTS = [
     aliases: ["arc-support"],
     keywords: ["support", "arc-support", "ticket", "customer"],
   },
+  {
+    id: "compliance",
+    name: "Compliance & Audit",
+    href: "/compliance",
+    icon: Shield,
+    color: "#10B981",
+    desc: "Regulatory / Safety / Provenance / Hallucination / Bias \u2014 full-mesh attestation",
+    aliases: ["arc-compliance"],
+    keywords: ["compliance", "arc-compliance", "audit", "attestation"],
+  },
 ];
 
 const CERTIFIED_ALIAS_SET = new Set(

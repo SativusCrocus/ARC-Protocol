@@ -365,3 +365,53 @@ export interface SupportVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Compliance & Audit Agent Types ─────────────────────────────────────────
+
+export interface ComplianceType {
+  key: string;
+  name: string;
+  summary: string;
+  controls: string[];
+}
+
+export interface ComplianceFinding {
+  phase: "scope" | "audit" | "evidence" | "report";
+  text: string;
+}
+
+export interface ComplianceResult {
+  prompt: string;
+  compliance_type: string;
+  compliance_name: string;
+  subject: string;
+  severity: string;
+  scope: string;
+  audit: string;
+  evidence: string;
+  report: string;
+  findings: ComplianceFinding[];
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface ComplianceChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface ComplianceVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

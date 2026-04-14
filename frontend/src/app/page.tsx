@@ -7,15 +7,15 @@ export const revalidate = 0;
 // Bulletproof floor: used if backend is unreachable at SSR time.
 // Matches the per-alias idempotent seed in backend/api.py — now includes
 // the arc-legal agent (+12 records, +9 actions, +37000 sats), the
-// arc-design agent (+1 genesis, +10 actions, +2 settlements = 13 records,
-// +10 actions, +20500 sats), and the arc-support agent
-// (+1 genesis, +20 actions, +3 settlements = 24 records, +20 actions,
-// +22000 sats).
+// arc-design agent (+13 records, +10 actions, +20500 sats), the
+// arc-support agent (+24 records, +20 actions, +22000 sats), and the
+// arc-compliance agent (+1 genesis, +20 actions, +3 settlements = 24
+// records, +20 actions, +42500 sats).
 const FALLBACK_STATS: InitialStats = {
-  total: 130,
-  agents: 16,
-  actions: 101,
-  totalSats: 112500,
+  total: 154,
+  agents: 17,
+  actions: 121,
+  totalSats: 155000,
 };
 
 function getBackendUrl(): string {

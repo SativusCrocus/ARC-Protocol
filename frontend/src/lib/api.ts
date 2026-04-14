@@ -32,6 +32,10 @@ import type {
   SupportChainResult,
   SupportVerifyResult,
   SupportIssueType,
+  ComplianceResult,
+  ComplianceChainResult,
+  ComplianceVerifyResult,
+  ComplianceType,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -261,4 +265,26 @@ export const api = {
 
   supportVerify: (id: string) =>
     request<SupportVerifyResult>(`/support/verify/${id}`),
+
+  // ── Compliance & Audit ──────────────────────────────────────────────────
+  complianceTypes: () =>
+    request<{ types: ComplianceType[] }>("/compliance/types"),
+
+  compliance: (data: {
+    prompt: string;
+    compliance_type?: string;
+    subject?: string;
+    severity?: string;
+    model?: string;
+  }) =>
+    request<ComplianceResult>("/compliance", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  complianceChain: (id: string) =>
+    request<ComplianceChainResult>(`/compliance/chain/${id}`),
+
+  complianceVerify: (id: string) =>
+    request<ComplianceVerifyResult>(`/compliance/verify/${id}`),
 };

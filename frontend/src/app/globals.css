@@ -582,3 +582,65 @@
   border: 1px solid rgba(247, 147, 26, 0.18);
   border-radius: 14px 14px 2px 14px;
 }
+
+/* ── Compliance & Audit Agent (#10B981) ─────────────────────────────────── */
+
+.compliance-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(16, 185, 129, 0.02),
+    0 0 60px rgba(16, 185, 129, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.compliance-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(16, 185, 129, 0.05),
+    0 0 80px rgba(16, 185, 129, 0.06);
+}
+
+.compliance-dag-glow {
+  box-shadow:
+    0 0 40px rgba(16, 185, 129, 0.08),
+    inset 0 0 40px rgba(16, 185, 129, 0.02);
+  animation: compliance-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes compliance-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(16, 185, 129, 0.08),
+      inset 0 0 40px rgba(16, 185, 129, 0.02);
+  }
+  50% {
+    box-shadow:
+      0 0 80px rgba(16, 185, 129, 0.14),
+      inset 0 0 60px rgba(16, 185, 129, 0.06);
+  }
+}
+
+.compliance-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.compliance-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.45);
+}
+
+.compliance-report-paper {
+  background: linear-gradient(
+    180deg,
+    rgba(16, 185, 129, 0.04) 0%,
+    rgba(16, 185, 129, 0.01) 100%
+  );
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  border-radius: 10px;
+}
+
+.compliance-finding-chip {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: rgba(16, 185, 129, 0.85);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
