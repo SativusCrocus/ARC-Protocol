@@ -27,9 +27,13 @@ function layoutDAG(records: RecordWithId[]): { nodes: Node[]; edges: Edge[] } {
     agentGroups.get(pk)!.push(i);
   });
 
-  const agentKeys = Array.from(agentGroups.keys());
-  const laneHeight = 200;
-  const nodeSpacing = 300;
+  // Sort lanes by record count (largest first) so the longest chain anchors the top
+  const agentKeys = Array.from(agentGroups.keys()).sort(
+    (a, b) => agentGroups.get(b)!.length - agentGroups.get(a)!.length,
+  );
+  const laneHeight = 150;
+  const nodeSpacing = 230;
+  const nodeWidth = 200;
 
   const positions = new Map<string, { x: number; y: number }>();
   agentKeys.forEach((pk, laneIdx) => {
@@ -102,9 +106,9 @@ function layoutDAG(records: RecordWithId[]): { nodes: Node[]; edges: Edge[] } {
       style: {
         background: `radial-gradient(ellipse at 30% 20%, ${agentColor.color}08 0%, #0a0a0a 70%)`,
         border: `1.5px solid ${agentColor.color}${isGenesis ? "60" : "30"}`,
-        borderRadius: "16px",
-        padding: "10px",
-        width: 240,
+        borderRadius: "14px",
+        padding: "8px",
+        width: nodeWidth,
         cursor: "pointer",
         boxShadow: isGenesis
           ? `0 0 32px ${agentColor.glow}, inset 0 0 20px ${agentColor.color}10`
@@ -184,7 +188,9 @@ export function DAGViewer({ records }: { records: RecordWithId[] }) {
       nodes={nodes}
       edges={edges}
       fitView
-      fitViewOptions={{ padding: 0.3 }}
+      fitViewOptions={{ padding: 0.15, minZoom: 0.15, maxZoom: 1.2 }}
+      minZoom={0.1}
+      maxZoom={2}
       proOptions={{ hideAttribution: true }}
       style={{ background: "#020202" }}
       nodesDraggable

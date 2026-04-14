@@ -212,12 +212,12 @@ export default function DAGDashboard() {
               Agent Orbs
             </h3>
           </div>
-          <div className="flex items-center justify-center gap-12 py-6 rounded-xl border border-white/[0.04] bg-[#050505]">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-6 px-6 py-6 rounded-xl border border-white/[0.04] bg-[#050505]">
             {agentStats.map((agent, i) => (
               <GlowingOrb
                 key={agent.pubkey}
                 color={agent.color}
-                size={52 + agent.records * 2}
+                size={Math.min(52 + agent.records * 1.2, 78)}
                 delay={i * 0.7}
                 label={agent.alias}
                 count={agent.records}
@@ -274,7 +274,7 @@ export default function DAGDashboard() {
           </div>
         </div>
 
-        <div className="h-[500px] border border-white/[0.04] rounded-xl overflow-hidden bg-[#020202]">
+        <div className="h-[640px] border border-white/[0.04] rounded-xl overflow-hidden bg-[#020202]">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-[#F7931A]" />
