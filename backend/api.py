@@ -26,6 +26,7 @@ import codegen_agent as cg
 import trader_agent as ta
 import legal_agent as la
 import design_agent as da
+import support_agent as sa
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -1049,6 +1050,121 @@ def design_verify(request: Request, record_id: str):
     }
 
 
+# ── Customer Support Agent ──────────────────────────────────────────────────
+
+
+SUPPORTED_ISSUES = {
+    "billing", "technical", "account", "onboarding", "dispute", "general",
+}
+SUPPORTED_PRIORITIES = {"P0", "P1", "P2", "P3"}
+
+
+class SupportReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    issue_type: str = Field("general", max_length=32)
+    customer: str = Field("", max_length=128)
+    priority: str = Field("P2", max_length=8)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("issue_type")
+    @classmethod
+    def validate_issue(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_ISSUES:
+            raise ValueError(
+                f"issue_type must be one of: {', '.join(sorted(SUPPORTED_ISSUES))}"
+            )
+        return v
+
+    @field_validator("priority")
+    @classmethod
+    def validate_priority(cls, v: str) -> str:
+        v = v.upper()
+        if v not in SUPPORTED_PRIORITIES:
+            raise ValueError(
+                f"priority must be one of: {', '.join(sorted(SUPPORTED_PRIORITIES))}"
+            )
+        return v
+
+
+@app.get("/support/issues")
+@limiter.limit("60/minute")
+def support_issues(request: Request):
+    """Return the available support issue types + playbooks."""
+    return {"issues": sa.list_issue_types()}
+
+
+@app.post("/support")
+@limiter.limit("5/minute")
+def support(request: Request, req: SupportReq):
+    """Run LangGraph customer-support agent with cross-agent ARC inscriptions."""
+    try:
+        return sa.run_support(
+            prompt=req.prompt,
+            issue_type=req.issue_type,
+            customer=req.customer,
+            priority=req.priority,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Support agent error: {str(e)}")
+
+
+@app.get("/support/chain/{record_id}")
+@limiter.limit("60/minute")
+def support_chain(request: Request, record_id: str):
+    """Fetch the full support ticket chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/support/verify/{record_id}")
+@limiter.limit("60/minute")
+def support_verify(request: Request, record_id: str):
+    """Deep-verify a support record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -1228,6 +1344,37 @@ _SEED_AGENTS = [
         "settlements": [
             ("Design commission: Hero poster + IPFS hosting bundle \u2014 ARC-anchored", 12000),
             ("Design commission: Agent avatar pack \u2014 5 styles, ARC-anchored", 8500),
+        ],
+    },
+    {
+        "alias": "arc-support",
+        "genesis": "Customer Support agent initialized \u2014 LangGraph + Ollama + ARC cross-agent resolution mesh",
+        "actions": [
+            "Support triage (Billing): missing Lightning settlement reconciliation \u2014 Research + Trader memrefs",
+            "Support diagnosis: Trader signal invoice preimage mismatch \u2014 DAG walk against arc-defi-trader",
+            "Support resolution draft: refund path via ARC-anchored settlement reversal",
+            "Support QA pass: Billing resolution READY-TO-SEND \u2014 chain-anchored",
+            "Support ticket resolved (Billing & Payments): Lightning reconciliation \u2014 arc-defi-trader memref",
+            "Support triage (Technical): codegen agent crash on BIP-340 signer \u2014 Codegen memref",
+            "Support diagnosis: Rust Schnorr verifier regression \u2014 DAG walk against arc-codegen",
+            "Support resolution draft: hotfix patch inscription + re-verify chain",
+            "Support QA pass: Technical resolution READY-TO-SEND \u2014 memref chain clean",
+            "Support ticket resolved (Technical Issue): codegen hotfix \u2014 arc-codegen + arc-validator memrefs",
+            "Support triage (Dispute): marketplace job delivered but unpaid \u2014 Legal + Marketplace memrefs",
+            "Support diagnosis: contract milestone clause 4.b breached \u2014 DAG walk against arc-legal",
+            "Support resolution draft: remediation inscription + arbitration path",
+            "Support ticket resolved (Service Dispute): arc-legal + marketplace cross-agent anchor",
+            "Support triage (Onboarding): new AI lab agent spin-up \u2014 white-glove intake",
+            "Support ticket resolved (Onboarding): genesis + first memref into arc-deep-research",
+            "Support triage (Account & Keys): BIP-340 key rotation request \u2014 identity attestation",
+            "Support ticket resolved (Account & Keys): rotated alias anchored via memref",
+            "Support triage (General Inquiry): ARC memref semantics \u2014 arc-design citation",
+            "Support ticket resolved (General Inquiry): on-chain knowledge-base citation",
+        ],
+        "settlements": [
+            ("Support tier: Billing reconciliation service \u2014 ARC-anchored", 4500),
+            ("Support tier: Technical hotfix intake \u2014 ARC-anchored", 6500),
+            ("Support tier: Dispute mediation \u2014 cross-agent memref package", 11000),
         ],
     },
 ]

@@ -29,6 +29,7 @@ import {
   Link2,
   Scale,
   Image as ImageIcon,
+  HelpCircle,
 } from "lucide-react";
 
 const filterTabs = [
@@ -91,6 +92,16 @@ const CERTIFIED_AGENTS = [
     desc: "Generative design \u2014 Flux/Ollama prompts, IPFS CIDs, full DAG anchor",
     aliases: ["arc-design"],
     keywords: ["design", "arc-design", "image", "generative"],
+  },
+  {
+    id: "support",
+    name: "Customer Support",
+    href: "/support",
+    icon: HelpCircle,
+    color: "#38BDF8",
+    desc: "Triage \u2192 diagnose \u2192 resolve \u2014 every ticket cross-agent memref anchored",
+    aliases: ["arc-support"],
+    keywords: ["support", "arc-support", "ticket", "customer"],
   },
 ];
 

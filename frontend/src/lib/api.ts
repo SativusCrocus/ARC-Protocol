@@ -28,6 +28,10 @@ import type {
   DesignVerifyResult,
   DesignStyle,
   DesignAspectRatio,
+  SupportResult,
+  SupportChainResult,
+  SupportVerifyResult,
+  SupportIssueType,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -235,4 +239,26 @@ export const api = {
 
   designVerify: (id: string) =>
     request<DesignVerifyResult>(`/design/verify/${id}`),
+
+  // ── Customer Support ────────────────────────────────────────────────────
+  supportIssues: () =>
+    request<{ issues: SupportIssueType[] }>("/support/issues"),
+
+  support: (data: {
+    prompt: string;
+    issue_type?: string;
+    customer?: string;
+    priority?: string;
+    model?: string;
+  }) =>
+    request<SupportResult>("/support", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  supportChain: (id: string) =>
+    request<SupportChainResult>(`/support/chain/${id}`),
+
+  supportVerify: (id: string) =>
+    request<SupportVerifyResult>(`/support/verify/${id}`),
 };

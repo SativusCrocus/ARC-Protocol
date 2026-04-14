@@ -521,3 +521,64 @@
   border-radius: 999px;
   padding: 4px 10px;
 }
+
+/* ── Customer Support Agent (#38BDF8) ──────────────────────────────────── */
+
+.support-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(56, 189, 248, 0.02),
+    0 0 60px rgba(56, 189, 248, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.support-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(56, 189, 248, 0.05),
+    0 0 80px rgba(56, 189, 248, 0.06);
+}
+
+.support-dag-glow {
+  box-shadow:
+    0 0 40px rgba(56, 189, 248, 0.08),
+    inset 0 0 40px rgba(56, 189, 248, 0.02);
+  animation: support-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes support-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(56, 189, 248, 0.08),
+      inset 0 0 40px rgba(56, 189, 248, 0.02);
+  }
+  50% {
+    box-shadow:
+      0 0 80px rgba(56, 189, 248, 0.14),
+      inset 0 0 60px rgba(56, 189, 248, 0.06);
+  }
+}
+
+.support-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.support-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+}
+
+.support-chat-bubble-customer {
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.07) 0%,
+    rgba(56, 189, 248, 0.02) 100%
+  );
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 14px 14px 14px 2px;
+}
+
+.support-chat-bubble-agent {
+  background: linear-gradient(
+    135deg,
+    rgba(247, 147, 26, 0.05) 0%,
+    rgba(247, 147, 26, 0.015) 100%
+  );
+  border: 1px solid rgba(247, 147, 26, 0.18);
+  border-radius: 14px 14px 2px 14px;
+}

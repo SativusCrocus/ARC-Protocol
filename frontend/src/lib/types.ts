@@ -313,3 +313,55 @@ export interface DesignVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Customer Support Agent Types ────────────────────────────────────────────
+
+export interface SupportIssueType {
+  key: string;
+  name: string;
+  summary: string;
+  playbook: string[];
+}
+
+export interface SupportConversationTurn {
+  role: "customer" | "support";
+  phase?: "triage" | "diagnose" | "resolution" | "qa";
+  text: string;
+  ts?: string;
+}
+
+export interface SupportResult {
+  prompt: string;
+  issue_type: string;
+  issue_name: string;
+  customer: string;
+  priority: string;
+  triage: string;
+  diagnosis: string;
+  resolution: string;
+  qa: string;
+  conversation: SupportConversationTurn[];
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface SupportChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface SupportVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

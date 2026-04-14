@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Scale,
   Image as ImageIcon,
+  HelpCircle,
 } from "lucide-react";
 
 const links = [
@@ -29,6 +30,7 @@ const links = [
   { href: "/trader", label: "DeFi Trader", icon: TrendingUp },
   { href: "/legal", label: "Legal Contracts", icon: Scale },
   { href: "/design", label: "Design & Images", icon: ImageIcon },
+  { href: "/support", label: "Customer Support", icon: HelpCircle },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },
