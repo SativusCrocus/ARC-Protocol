@@ -7,11 +7,8 @@ DB="$ARC_DIR/records.db"
 
 mkdir -p "$KEYS_DIR"
 
-# Seed DB from baked-in copy if volume is empty
-if [ ! -f "$DB" ] && [ -f /app/seed.db ]; then
-  cp /app/seed.db "$DB"
-  echo "Seeded records.db from build image"
-fi
+# DB is seeded at FastAPI startup via seed_production_db() in api.py.
+# No baked seed.db — keeps the records table free of legacy ?-alias rows.
 
 # Auto-generate a signing key if none exist
 if [ -z "$(ls -A "$KEYS_DIR" 2>/dev/null)" ]; then
