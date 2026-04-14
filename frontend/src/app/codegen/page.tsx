@@ -226,10 +226,28 @@ export default function CodegenPage() {
     enabled: !!result?.final_id,
   });
 
-  const allRecords: RecordWithId[] = [
+  // Fallback: when no active result, pull the live codegen alias chain so the
+  // page is never empty — shows the seeded arc-codegen records + DAG.
+  const seedRecordsQuery = useQuery({
+    queryKey: ["records"],
+    queryFn: api.records,
+    staleTime: 10_000,
+  });
+
+  const seedCodegenRecords: RecordWithId[] = (seedRecordsQuery.data || [])
+    .filter(
+      (r) =>
+        (r.record.agent.alias || "").toLowerCase() === "arc-codegen",
+    )
+    .sort((a, b) => (a.record.ts < b.record.ts ? -1 : 1));
+
+  const activeRecords: RecordWithId[] = [
     ...(chainQuery.data?.chain || result?.chain || []),
     ...(chainQuery.data?.memref_records || []),
   ];
+
+  const allRecords: RecordWithId[] =
+    activeRecords.length > 0 ? activeRecords : seedCodegenRecords;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -641,6 +659,77 @@ export default function CodegenPage() {
               records: {result.record_ids.length} | dag_refs:{" "}
               {result.dag_memrefs.length}
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Inscriptions (seeded arc-codegen chain) — shown before any submission */}
+      {!result && !mutation.isPending && seedCodegenRecords.length > 0 && (
+        <div className="space-y-4 anim-fade-up anim-delay-1">
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              {
+                label: "Records",
+                value: seedCodegenRecords.length,
+                icon: Layers,
+                color: "#a855f7",
+              },
+              {
+                label: "Agent",
+                value: "arc-codegen",
+                icon: Code2,
+                color: "#F7931A",
+                isText: true,
+              },
+              {
+                label: "Status",
+                value: "LIVE",
+                icon: Check,
+                color: "#22c55e",
+                isText: true,
+              },
+            ].map(({ label, value, icon: Icon, color, isText }) => (
+              <Card key={label} className="border-white/[0.04] bg-[#0a0a0a]">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon className="h-3 w-3" style={{ color: `${color}80` }} />
+                    <span className="text-[9px] text-white/25 uppercase tracking-wider">
+                      {label}
+                    </span>
+                  </div>
+                  <p
+                    className={`${isText ? "text-sm" : "text-xl"} font-bold`}
+                    style={{ color }}
+                  >
+                    {value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <GitBranch className="h-3.5 w-3.5 text-[#a855f7]/50" />
+              <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
+                Recent Codegen Inscriptions
+              </h3>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-[#a855f7]/60 border-[#a855f7]/20 px-1.5"
+              >
+                live seed chain
+              </Badge>
+            </div>
+            <div className="h-[400px] border border-[#a855f7]/10 rounded-xl overflow-hidden bg-[#020202] codegen-dag-glow">
+              <Suspense
+                fallback={
+                  <div className="h-full skeleton-shimmer rounded-xl" />
+                }
+              >
+                <DAGViewer records={seedCodegenRecords} />
+              </Suspense>
+            </div>
           </div>
         </div>
       )}

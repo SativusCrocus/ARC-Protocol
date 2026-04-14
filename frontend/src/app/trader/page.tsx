@@ -170,10 +170,28 @@ export default function TraderPage() {
     enabled: !!result?.final_id,
   });
 
-  const allRecords: RecordWithId[] = [
+  // Fallback: when no active result, pull the live arc-defi-trader chain so
+  // the page is never empty — shows the seeded records + glowing DAG.
+  const seedRecordsQuery = useQuery({
+    queryKey: ["records"],
+    queryFn: api.records,
+    staleTime: 10_000,
+  });
+
+  const seedTraderRecords: RecordWithId[] = (seedRecordsQuery.data || [])
+    .filter(
+      (r) =>
+        (r.record.agent.alias || "").toLowerCase() === "arc-defi-trader",
+    )
+    .sort((a, b) => (a.record.ts < b.record.ts ? -1 : 1));
+
+  const activeRecords: RecordWithId[] = [
     ...(chainQuery.data?.chain || result?.chain || []),
     ...(chainQuery.data?.memref_records || []),
   ];
+
+  const allRecords: RecordWithId[] =
+    activeRecords.length > 0 ? activeRecords : seedTraderRecords;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -648,6 +666,89 @@ export default function TraderPage() {
               {result.dag_memrefs.length} | settled:{" "}
               {result.signal_fee_sats} sats
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Inscriptions (seeded arc-defi-trader chain) — shown before any submission */}
+      {!result && !mutation.isPending && seedTraderRecords.length > 0 && (
+        <div className="space-y-4 anim-fade-up anim-delay-1">
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              {
+                label: "Records",
+                value: seedTraderRecords.length,
+                icon: Layers,
+                color: "#22c55e",
+              },
+              {
+                label: "Settled",
+                value: seedTraderRecords
+                  .reduce(
+                    (s, r) => s + (r.record.settlement?.amount_sats || 0),
+                    0,
+                  )
+                  .toLocaleString(),
+                icon: Zap,
+                color: "#eab308",
+                isText: true,
+              },
+              {
+                label: "Agent",
+                value: "arc-defi-trader",
+                icon: TrendingUp,
+                color: "#F7931A",
+                isText: true,
+              },
+              {
+                label: "Status",
+                value: "LIVE",
+                icon: Check,
+                color: "#22c55e",
+                isText: true,
+              },
+            ].map(({ label, value, icon: Icon, color, isText }) => (
+              <Card key={label} className="border-white/[0.04] bg-[#0a0a0a]">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon className="h-3 w-3" style={{ color: `${color}80` }} />
+                    <span className="text-[9px] text-white/25 uppercase tracking-wider">
+                      {label}
+                    </span>
+                  </div>
+                  <p
+                    className={`${isText ? "text-sm" : "text-xl"} font-bold truncate`}
+                    style={{ color }}
+                  >
+                    {value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <GitBranch className="h-3.5 w-3.5 text-[#22c55e]/50" />
+              <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
+                Recent Trader Inscriptions
+              </h3>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-[#22c55e]/60 border-[#22c55e]/20 px-1.5"
+              >
+                live seed chain
+              </Badge>
+            </div>
+            <div className="h-[450px] border border-[#22c55e]/10 rounded-xl overflow-hidden bg-[#020202] trader-dag-glow">
+              <Suspense
+                fallback={
+                  <div className="h-full skeleton-shimmer rounded-xl" />
+                }
+              >
+                <DAGViewer records={seedTraderRecords} />
+              </Suspense>
+            </div>
           </div>
         </div>
       )}
