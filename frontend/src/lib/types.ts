@@ -415,3 +415,53 @@ export interface ComplianceVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Data Analysis Agent Types ───────────────────────────────────────────────
+
+export interface DataAnalysisType {
+  key: string;
+  name: string;
+  summary: string;
+  methods: string[];
+}
+
+export interface DataFinding {
+  phase: "profile" | "analysis" | "insights" | "report";
+  text: string;
+}
+
+export interface DataResult {
+  prompt: string;
+  analysis_type: string;
+  analysis_name: string;
+  dataset: string;
+  rows_hint: number;
+  profile: string;
+  analysis: string;
+  insights: string;
+  report: string;
+  findings: DataFinding[];
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface DataChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface DataVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

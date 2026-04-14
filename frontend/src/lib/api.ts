@@ -36,6 +36,10 @@ import type {
   ComplianceChainResult,
   ComplianceVerifyResult,
   ComplianceType,
+  DataResult,
+  DataChainResult,
+  DataVerifyResult,
+  DataAnalysisType,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -287,4 +291,26 @@ export const api = {
 
   complianceVerify: (id: string) =>
     request<ComplianceVerifyResult>(`/compliance/verify/${id}`),
+
+  // ── Data Analysis ───────────────────────────────────────────────────────
+  dataTypes: () =>
+    request<{ types: DataAnalysisType[] }>("/data/types"),
+
+  data: (data: {
+    prompt: string;
+    analysis_type?: string;
+    dataset?: string;
+    rows_hint?: number;
+    model?: string;
+  }) =>
+    request<DataResult>("/data", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  dataChain: (id: string) =>
+    request<DataChainResult>(`/data/chain/${id}`),
+
+  dataVerify: (id: string) =>
+    request<DataVerifyResult>(`/data/verify/${id}`),
 };

@@ -22,6 +22,7 @@ import {
   Image as ImageIcon,
   HelpCircle,
   Shield,
+  BarChart,
 } from "lucide-react";
 
 const links = [
@@ -33,6 +34,7 @@ const links = [
   { href: "/design", label: "Design & Images", icon: ImageIcon },
   { href: "/support", label: "Customer Support", icon: HelpCircle },
   { href: "/compliance", label: "Compliance & Audit", icon: Shield },
+  { href: "/data", label: "Data Analysis", icon: BarChart },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },

@@ -644,3 +644,54 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+
+/* ── Data Analysis Agent (#6366F1) ──────────────────────────────────────── */
+
+.data-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(99, 102, 241, 0.02),
+    0 0 60px rgba(99, 102, 241, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.data-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(99, 102, 241, 0.05),
+    0 0 80px rgba(99, 102, 241, 0.06);
+}
+
+.data-dag-glow {
+  box-shadow:
+    0 0 40px rgba(99, 102, 241, 0.1),
+    inset 0 0 40px rgba(99, 102, 241, 0.03);
+  animation: data-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes data-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(99, 102, 241, 0.1),
+      inset 0 0 40px rgba(99, 102, 241, 0.03);
+  }
+  50% {
+    box-shadow:
+      0 0 90px rgba(99, 102, 241, 0.18),
+      inset 0 0 60px rgba(99, 102, 241, 0.08);
+  }
+}
+
+.data-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.data-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.5);
+}
+
+.data-report-paper {
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.05) 0%,
+    rgba(99, 102, 241, 0.01) 100%
+  );
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 10px;
+}

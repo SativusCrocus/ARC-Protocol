@@ -28,6 +28,7 @@ import legal_agent as la
 import design_agent as da
 import support_agent as sa
 import compliance_agent as coa
+import data_agent as dta
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -1283,6 +1284,111 @@ def compliance_verify(request: Request, record_id: str):
     }
 
 
+# ── Data Analysis Agent ─────────────────────────────────────────────────────
+
+
+SUPPORTED_ANALYSIS_TYPES = {
+    "trends", "correlations", "anomaly_detection", "summary",
+}
+
+
+class DataReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    analysis_type: str = Field("trends", max_length=32)
+    dataset: str = Field("", max_length=128)
+    rows_hint: int = Field(100000, ge=0, le=10_000_000_000)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("analysis_type")
+    @classmethod
+    def validate_atype(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_ANALYSIS_TYPES:
+            raise ValueError(
+                f"analysis_type must be one of: "
+                f"{', '.join(sorted(SUPPORTED_ANALYSIS_TYPES))}"
+            )
+        return v
+
+
+@app.get("/data/types")
+@limiter.limit("60/minute")
+def data_types(request: Request):
+    """Return the available data analysis types + method sets."""
+    return {"types": dta.list_analysis_types()}
+
+
+@app.post("/data")
+@limiter.limit("5/minute")
+def data(request: Request, req: DataReq):
+    """Run LangGraph data analysis agent with cross-agent ARC inscriptions."""
+    try:
+        return dta.run_data_analysis(
+            prompt=req.prompt,
+            analysis_type=req.analysis_type,
+            dataset=req.dataset,
+            rows_hint=req.rows_hint,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Data agent error: {str(e)}")
+
+
+@app.get("/data/chain/{record_id}")
+@limiter.limit("60/minute")
+def data_chain(request: Request, record_id: str):
+    """Fetch the full data analysis chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/data/verify/{record_id}")
+@limiter.limit("60/minute")
+def data_verify(request: Request, record_id: str):
+    """Deep-verify a data-analysis record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -1524,6 +1630,35 @@ _SEED_AGENTS = [
             ("Compliance tier: Regulatory attestation bundle \u2014 ARC-anchored", 14500),
             ("Compliance tier: Safety red-team pass \u2014 ARC-anchored", 9500),
             ("Compliance tier: Full-mesh provenance audit \u2014 cross-agent package", 18500),
+        ],
+    },
+    {
+        "alias": "arc-data",
+        "genesis": "Data Analysis agent initialized \u2014 LangGraph + Ollama + ARC cross-agent analytics mesh",
+        "actions": [
+            "Data profile (Trends): BTC/USD tick stream 30d + arc-defi-trader signal history",
+            "Data analysis (Trends): rolling OLS + regime switch detection \u2014 DAG walk against arc-defi-trader",
+            "Data insights bundle: trend momentum up-regime \u2014 cross-agent memref corroboration",
+            "Data report draft (Trends): quarterly BTC/USD momentum attestation \u2014 anchored",
+            "Data analysis inscribed (Trends): arc-defi-trader + arc-deep-research attestation",
+            "Data profile (Correlations): agent-emission stream across arc-codegen + arc-legal + arc-support",
+            "Data analysis (Correlations): Granger causality + mutual-information lattice",
+            "Data insights bundle: lead-lag map \u2014 arc-compliance follows arc-legal by 2.3 records",
+            "Data analysis inscribed (Correlations): cross-agent coupling heatmap",
+            "Data profile (Anomaly Detection): arc-mesh telemetry \u2014 isolation forest + LOF features",
+            "Data analysis (Anomaly Detection): outlier sweep across settlement + action streams",
+            "Data insights bundle: anomaly cluster \u2014 arc-defi-trader outlier batch flagged",
+            "Data analysis inscribed (Anomaly Detection): severity-tagged outlier ledger",
+            "Data profile (Summary): full-mesh descriptive stats + missingness map",
+            "Data analysis (Summary): moments + quantiles + top-correlation lattice",
+            "Data insights bundle: executive one-pager \u2014 7-agent mesh roll-up",
+            "Data analysis inscribed (Summary): one-page executive attestation",
+            "Data meta-analysis: full-mesh analytic witness \u2014 cross-signed by all certified agents",
+        ],
+        "settlements": [
+            ("Data tier: Trends attestation bundle \u2014 ARC-anchored", 8500),
+            ("Data tier: Correlations + anomaly package \u2014 ARC-anchored", 12500),
+            ("Data tier: Full-mesh analytic summary \u2014 cross-agent package", 16500),
         ],
     },
 ]

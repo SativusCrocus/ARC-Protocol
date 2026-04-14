@@ -30,6 +30,7 @@ import {
   Scale,
   Image as ImageIcon,
   HelpCircle,
+  BarChart,
 } from "lucide-react";
 
 const filterTabs = [
@@ -112,6 +113,16 @@ const CERTIFIED_AGENTS = [
     desc: "Regulatory / Safety / Provenance / Hallucination / Bias \u2014 full-mesh attestation",
     aliases: ["arc-compliance"],
     keywords: ["compliance", "arc-compliance", "audit", "attestation"],
+  },
+  {
+    id: "data",
+    name: "Data Analysis",
+    href: "/data",
+    icon: BarChart,
+    color: "#6366F1",
+    desc: "Trends / Correlations / Anomaly Detection / Summary \u2014 full-mesh analytics anchor",
+    aliases: ["arc-data"],
+    keywords: ["data", "arc-data", "analysis", "analytics", "trends"],
   },
 ];
 
