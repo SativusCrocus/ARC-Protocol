@@ -1499,6 +1499,85 @@ def orchestrator_chain(request: Request, record_id: str):
     return {"chain": chain, "memref_records": memref_records}
 
 
+class LiveSpawnReq(BaseModel):
+    kinds: list[str] = Field(
+        default_factory=lambda: ["marketing", "finance", "security"]
+    )
+    trigger: str = Field("live-spawn", max_length=48)
+
+    @field_validator("kinds")
+    @classmethod
+    def validate_kinds(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("kinds must be non-empty")
+        if len(v) > 6:
+            raise ValueError("at most 6 kinds per live spawn run")
+        allowed = {
+            "research", "codegen", "trader", "legal",
+            "design", "support", "compliance", "data",
+            "marketing", "finance", "security", "ops", "product", "community",
+        }
+        out: list[str] = []
+        for k in v:
+            kl = k.lower().strip()
+            if kl not in allowed:
+                raise ValueError(f"unknown kind: {k}")
+            if kl not in out:
+                out.append(kl)
+        return out
+
+
+@app.post("/orchestrator/live-spawn")
+@limiter.limit("6/minute")
+def orchestrator_live_spawn(request: Request, req: LiveSpawnReq):
+    """Spawn N new child agents in one shot — each inscribed with full-DAG memref."""
+    try:
+        return oa.live_spawn_run(kinds=req.kinds, trigger=req.trigger)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Live spawn error: {str(e)}")
+
+
+@app.get("/orchestrator/children/extra")
+@limiter.limit("60/minute")
+def orchestrator_children_extra(request: Request):
+    """Catalog of extra spawnable child kinds (marketing, finance, security, etc)."""
+    return {"children": oa.list_extra_child_agents()}
+
+
+@app.get("/orchestrator/schedule")
+@limiter.limit("60/minute")
+def orchestrator_schedule(request: Request):
+    """Current schedule status — last tick, next tick, rotation, history.
+
+    Serverless-safe: opportunistically fires the 6h tick if due on read so
+    the cron works even without a persistent background worker.
+    """
+    fired = None
+    try:
+        status0 = oa.schedule_status()
+        if status0.get("seconds_until_next", 1) <= 0 and status0.get("enabled"):
+            fired = oa.schedule_tick(force=False)
+    except Exception as e:  # noqa: BLE001
+        log.error("lazy schedule tick failed: %s", e)
+    status = oa.schedule_status()
+    if fired and fired.get("ran"):
+        status["just_fired"] = fired
+    return status
+
+
+@app.post("/orchestrator/schedule/tick")
+@limiter.limit("6/minute")
+def orchestrator_schedule_tick(request: Request, force: bool = True):
+    """Manually fire the scheduler (default force=true, from the UI button)."""
+    try:
+        result = oa.schedule_tick(force=bool(force))
+        return {"tick": result, "status": oa.schedule_status()}
+    except Exception as e:
+        raise HTTPException(500, f"Schedule tick error: {str(e)}")
+
+
 @app.get("/orchestrator/verify/{record_id}")
 @limiter.limit("60/minute")
 def orchestrator_verify(request: Request, record_id: str):
@@ -1905,6 +1984,11 @@ def _startup_seed():
         log.info("startup seed_production_db completed (arc_dir=%s)", arc.ARC_DIR)
     except Exception as e:  # noqa: BLE001
         log.error("startup seed failed: %s\n%s", e, traceback.format_exc())
+    try:
+        started = oa.start_scheduler()
+        log.info("orchestrator scheduler start=%s", started)
+    except Exception as e:  # noqa: BLE001
+        log.error("orchestrator scheduler start failed: %s", e)
 
 
 # Also run at import time so seeding happens even if the startup event

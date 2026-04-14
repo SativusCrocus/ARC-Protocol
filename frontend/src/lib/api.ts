@@ -45,6 +45,9 @@ import type {
   OrchestratorResult,
   OrchestratorChainResult,
   OrchestratorVerifyResult,
+  LiveSpawnResult,
+  ScheduleStatus,
+  ScheduleTickResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -344,4 +347,24 @@ export const api = {
 
   orchestratorVerify: (id: string) =>
     request<OrchestratorVerifyResult>(`/orchestrator/verify/${id}`),
+
+  orchestratorChildrenExtra: () =>
+    request<{ children: OrchestratorChildAgent[] }>(
+      "/orchestrator/children/extra",
+    ),
+
+  orchestratorLiveSpawn: (data: { kinds: string[]; trigger?: string }) =>
+    request<LiveSpawnResult>("/orchestrator/live-spawn", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  orchestratorSchedule: () =>
+    request<ScheduleStatus>("/orchestrator/schedule"),
+
+  orchestratorScheduleTick: (force = true) =>
+    request<ScheduleTickResult>(
+      `/orchestrator/schedule/tick?force=${force ? "true" : "false"}`,
+      { method: "POST", body: JSON.stringify({}) },
+    ),
 };

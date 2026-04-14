@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, Suspense, useCallback, useMemo } from "react";
+import { useState, Suspense, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,11 +35,19 @@ import {
   BarChart,
   Rocket,
   Bot,
+  Clock,
+  PlayCircle,
+  Radio,
+  Megaphone,
+  Wallet,
+  Lock,
 } from "lucide-react";
 import type {
   OrchestratorResult,
   OrchestratorVerifyResult,
   RecordWithId,
+  LiveSpawnResult,
+  OrchestratorSpawnedChild,
 } from "@/lib/types";
 
 const DAGViewer = dynamic(
@@ -60,6 +68,35 @@ const CHILD_AGENTS = [
   { key: "compliance", name: "Compliance & Audit", icon: Shield, color: "#10B981", role: "compliance audit specialist" },
   { key: "data", name: "Data Analysis", icon: BarChart, color: "#6366F1", role: "data analysis specialist" },
 ] as const;
+
+// Extra live-spawn catalog (mirrors backend EXTRA_CHILD_AGENTS)
+const EXTRA_CHILD_AGENTS = [
+  { key: "marketing", name: "Marketing Agent", icon: Megaphone, color: "#F43F5E", role: "marketing + growth specialist" },
+  { key: "finance", name: "Finance Agent", icon: Wallet, color: "#14B8A6", role: "finance + treasury specialist" },
+  { key: "security", name: "Security Agent", icon: Lock, color: "#EF4444", role: "security + red-team specialist" },
+  { key: "ops", name: "Ops Agent", icon: Activity, color: "#3B82F6", role: "ops + infra specialist" },
+  { key: "product", name: "Product Agent", icon: Sparkles, color: "#F59E0B", role: "product + PRD specialist" },
+  { key: "community", name: "Community Agent", icon: Radio, color: "#D946EF", role: "community + relay specialist" },
+] as const;
+
+function fmtCountdown(secs: number): string {
+  if (secs <= 0) return "due now";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function fmtRelTs(ts: number): string {
+  if (!ts) return "never";
+  const d = Date.now() / 1000 - ts;
+  if (d < 60) return `${Math.floor(d)}s ago`;
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  return `${Math.floor(d / 86400)}d ago`;
+}
 
 const STEPS = [
   { key: "init", label: "Identity", icon: Zap, color: "#F97316" },
@@ -216,6 +253,7 @@ function SpawnInscribeButton({
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function OrchestratorPage() {
+  const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [selected, setSelected] = useState<string[]>([
     "research",
@@ -229,6 +267,69 @@ export default function OrchestratorPage() {
     useState<OrchestratorVerifyResult | null>(null);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);
+
+  // Live spawn + schedule state
+  const [spawnLog, setSpawnLog] = useState<
+    { ts: number; kind: string; alias: string; genesis_id: string; trigger: string; color: string }[]
+  >([]);
+  const [liveSpawnKinds] = useState<string[]>([
+    "marketing",
+    "finance",
+    "security",
+  ]);
+  const [countdownTick, setCountdownTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setCountdownTick((c) => c + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const liveSpawnMutation = useMutation({
+    mutationFn: (kinds: string[]) =>
+      api.orchestratorLiveSpawn({ kinds, trigger: "live-spawn" }),
+    onSuccess: (data: LiveSpawnResult) => {
+      const entries = data.spawned.map((s: OrchestratorSpawnedChild) => ({
+        ts: Math.floor(Date.now() / 1000),
+        kind: s.kind,
+        alias: s.alias,
+        genesis_id: s.genesis_id,
+        trigger: data.trigger,
+        color: s.color,
+      }));
+      setSpawnLog((prev) => [...entries.reverse(), ...prev].slice(0, 40));
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["orchestrator-schedule"] });
+    },
+  });
+
+  const scheduleQuery = useQuery({
+    queryKey: ["orchestrator-schedule"],
+    queryFn: api.orchestratorSchedule,
+    refetchInterval: 30_000,
+  });
+
+  const scheduleTick = useMutation({
+    mutationFn: () => api.orchestratorScheduleTick(true),
+    onSuccess: (data) => {
+      if (data.tick.ran && data.tick.child) {
+        const c = data.tick.child;
+        setSpawnLog((prev) =>
+          [
+            {
+              ts: Math.floor(Date.now() / 1000),
+              kind: c.kind,
+              alias: c.alias,
+              genesis_id: c.genesis_id,
+              trigger: "schedule-6h",
+              color: c.color,
+            },
+            ...prev,
+          ].slice(0, 40),
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["orchestrator-schedule"] });
+    },
+  });
 
   const toggleChild = useCallback((key: string) => {
     setSelected((prev) =>
@@ -481,6 +582,410 @@ export default function OrchestratorPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* ── Live Spawn Run ─────────────────────────────────────────────── */}
+      <Card className="border-[#F97316]/20 bg-[#0a0a0a] orch-card-glow">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Rocket className="h-3.5 w-3.5 text-[#F97316]" />
+                <h4 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  Live Spawn Run
+                </h4>
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-[#F97316]/80 border-[#F97316]/30 px-1.5 uppercase"
+                >
+                  3 children
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-emerald-400/80 border-emerald-400/30 px-1.5 uppercase"
+                >
+                  full-DAG memref
+                </Badge>
+              </div>
+              <p className="text-[11px] text-white/40">
+                Seed a real ARC spawn: inscribe Marketing + Finance + Security
+                child agents in one shot — each with a fresh BIP-340 keypair,
+                genesis record, and mandatory full-mesh memref.
+              </p>
+            </div>
+            <Button
+              onClick={() => liveSpawnMutation.mutate(liveSpawnKinds)}
+              disabled={liveSpawnMutation.isPending}
+              className="bg-[#F97316]/15 border border-[#F97316]/40 text-[#F97316] hover:bg-[#F97316]/25 orch-btn-glow"
+            >
+              {liveSpawnMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Spawning 3 children...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-4 w-4 mr-2" />
+                  Seed Live Spawn Run
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4">
+            {EXTRA_CHILD_AGENTS.filter((c) =>
+              liveSpawnKinds.includes(c.key),
+            ).map((c) => {
+              const Icon = c.icon;
+              return (
+                <div
+                  key={c.key}
+                  className="flex items-center gap-3 p-3 rounded-lg border"
+                  style={{
+                    borderColor: `${c.color}33`,
+                    background: `linear-gradient(90deg, ${c.color}0f, transparent 70%)`,
+                  }}
+                >
+                  <div
+                    className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      backgroundColor: `${c.color}15`,
+                      border: `1px solid ${c.color}40`,
+                    }}
+                  >
+                    <Icon className="h-4 w-4" style={{ color: c.color }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="text-[12px] font-semibold"
+                      style={{ color: c.color }}
+                    >
+                      {c.name}
+                    </div>
+                    <div className="text-[10px] text-white/40 font-mono truncate">
+                      arc-child-{c.key}-&lt;stamp&gt;
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {liveSpawnMutation.data && (
+            <div className="mt-4 border-t border-white/[0.04] pt-3 text-[11px] text-white/60">
+              <div className="flex items-center gap-2 mb-1">
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-emerald-400">
+                  {liveSpawnMutation.data.spawned.length} child(ren) inscribed
+                </span>
+                <span className="text-white/30 font-mono ml-2">
+                  summary {liveSpawnMutation.data.summary_id.slice(0, 16)}...
+                </span>
+              </div>
+            </div>
+          )}
+          {liveSpawnMutation.isError && (
+            <p className="mt-3 text-[11px] text-red-400">
+              {liveSpawnMutation.error instanceof Error
+                ? liveSpawnMutation.error.message
+                : "Live spawn failed"}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── /schedule : 6h Cron Auto-Spawn ────────────────────────────── */}
+      <Card className="border-[#F97316]/15 bg-[#0a0a0a] orch-card-glow">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="h-3.5 w-3.5 text-[#F97316]" />
+                <h4 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                  /schedule
+                </h4>
+                <code className="text-[10px] text-[#F97316]/80 bg-[#F97316]/10 border border-[#F97316]/30 rounded px-1.5 py-0.5 font-mono">
+                  {scheduleQuery.data?.cron || "0 */6 * * *"}
+                </code>
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-white/50 border-white/20 px-1.5 uppercase"
+                >
+                  every 6h
+                </Badge>
+                {scheduleQuery.data?.enabled && (
+                  <Badge
+                    variant="outline"
+                    className="text-[8px] text-emerald-400/80 border-emerald-400/30 px-1.5 uppercase"
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
+                    armed
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[11px] text-white/40">
+                Auto-spawns one new child agent every 6 hours in a round-robin
+                rotation — each inscribed with a full-DAG memref. Exponential
+                ledger growth without operator input.
+              </p>
+            </div>
+            <Button
+              onClick={() => scheduleTick.mutate()}
+              disabled={scheduleTick.isPending}
+              variant="outline"
+              className="gap-2 border-[#F97316]/20 text-[#F97316]/80 hover:border-[#F97316]/40 hover:text-[#F97316]"
+            >
+              {scheduleTick.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PlayCircle className="h-3.5 w-3.5" />
+              )}
+              Tick now
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1">
+                Next tick in
+              </div>
+              <div
+                className="text-sm font-bold font-mono text-[#F97316]"
+                key={countdownTick}
+              >
+                {scheduleQuery.data
+                  ? fmtCountdown(
+                      Math.max(
+                        0,
+                        (scheduleQuery.data.next_run -
+                          Math.floor(Date.now() / 1000)) |
+                          0,
+                      ),
+                    )
+                  : "…"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1">
+                Next kind
+              </div>
+              <div className="text-sm font-semibold text-white/80 capitalize">
+                {scheduleQuery.data?.next_kind || "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1">
+                Last tick
+              </div>
+              <div className="text-sm font-mono text-white/60">
+                {scheduleQuery.data
+                  ? fmtRelTs(scheduleQuery.data.last_run)
+                  : "—"}
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1">
+                History
+              </div>
+              <div className="text-sm font-bold text-white/80">
+                {scheduleQuery.data?.history.length || 0}
+                <span className="text-[10px] text-white/30 ml-1 font-normal">
+                  ticks
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Rotation pills */}
+          <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[9px] uppercase tracking-wider text-white/25 mr-1">
+              Rotation
+            </span>
+            {(scheduleQuery.data?.rotation || [
+              "marketing",
+              "finance",
+              "security",
+              "ops",
+              "product",
+              "community",
+            ]).map((k: string) => {
+              const cfg = EXTRA_CHILD_AGENTS.find((e) => e.key === k);
+              const isNext = k === scheduleQuery.data?.next_kind;
+              return (
+                <span
+                  key={k}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono capitalize"
+                  style={{
+                    color: cfg?.color || "#F97316",
+                    borderColor: isNext
+                      ? `${cfg?.color || "#F97316"}80`
+                      : `${cfg?.color || "#F97316"}30`,
+                    backgroundColor: isNext
+                      ? `${cfg?.color || "#F97316"}18`
+                      : `${cfg?.color || "#F97316"}08`,
+                    boxShadow: isNext
+                      ? `0 0 12px ${cfg?.color || "#F97316"}40`
+                      : "none",
+                  }}
+                >
+                  {isNext && (
+                    <span
+                      className="inline-block w-1 h-1 rounded-full animate-pulse"
+                      style={{ backgroundColor: cfg?.color || "#F97316" }}
+                    />
+                  )}
+                  {k}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Tick history from backend */}
+          {scheduleQuery.data && scheduleQuery.data.history.length > 0 && (
+            <div className="mt-4 border-t border-white/[0.04] pt-3">
+              <div className="text-[9px] uppercase tracking-wider text-white/25 mb-2">
+                Schedule ledger
+              </div>
+              <div className="space-y-1 max-h-[140px] overflow-y-auto">
+                {scheduleQuery.data.history
+                  .slice()
+                  .reverse()
+                  .map((h, i) => {
+                    const cfg = EXTRA_CHILD_AGENTS.find(
+                      (e) => e.key === h.kind,
+                    );
+                    return (
+                      <div
+                        key={`${h.ts}-${i}`}
+                        className="flex items-center gap-2 text-[10px] font-mono"
+                      >
+                        <span
+                          className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: cfg?.color || "#F97316" }}
+                        />
+                        <span
+                          className="capitalize"
+                          style={{ color: cfg?.color || "#F97316" }}
+                        >
+                          {h.kind}
+                        </span>
+                        <span className="text-white/50 truncate">
+                          {h.alias}
+                        </span>
+                        <span className="ml-auto text-white/25 shrink-0">
+                          {fmtRelTs(h.ts)}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Real-time Spawn Log + Live DAG ─────────────────────────────── */}
+      {(spawnLog.length > 0 ||
+        (scheduleQuery.data && scheduleQuery.data.history.length > 0)) && (
+        <Card className="border-[#F97316]/15 bg-[#0a0a0a] orch-card-glow">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <Radio className="h-3.5 w-3.5 text-[#F97316] animate-pulse" />
+              <h4 className="text-xs text-white/50 uppercase tracking-wider font-medium">
+                Real-time Spawn Log
+              </h4>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-[#F97316]/80 border-[#F97316]/30 px-1.5 uppercase"
+              >
+                {spawnLog.length} this session
+              </Badge>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-emerald-400/80 border-emerald-400/30 px-1.5 uppercase"
+              >
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
+                live
+              </Badge>
+            </div>
+            <div className="space-y-1.5 max-h-[260px] overflow-y-auto font-mono text-[11px]">
+              {spawnLog.length === 0 && (
+                <p className="text-white/25 italic text-[11px]">
+                  Waiting for a spawn... hit "Seed Live Spawn Run" or "Tick
+                  now" above.
+                </p>
+              )}
+              {spawnLog.map((e, i) => (
+                <div
+                  key={`${e.ts}-${i}-${e.alias}`}
+                  className="flex items-center gap-2 rounded-md border px-2 py-1.5 anim-fade-up"
+                  style={{
+                    borderColor: `${e.color}30`,
+                    background: `linear-gradient(90deg, ${e.color}10, transparent 80%)`,
+                  }}
+                >
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+                    style={{
+                      backgroundColor: e.color,
+                      boxShadow: `0 0 8px ${e.color}`,
+                    }}
+                  />
+                  <span
+                    className="uppercase tracking-wider text-[9px] font-bold shrink-0"
+                    style={{ color: e.color }}
+                  >
+                    {e.trigger}
+                  </span>
+                  <span
+                    className="capitalize shrink-0"
+                    style={{ color: e.color }}
+                  >
+                    {e.kind}
+                  </span>
+                  <span className="text-white/60 truncate">{e.alias}</span>
+                  <span className="text-white/20 shrink-0">
+                    genesis {e.genesis_id.slice(0, 10)}...
+                  </span>
+                  <span className="ml-auto text-white/25 shrink-0">
+                    {fmtRelTs(e.ts)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Live glowing DAG of the whole orchestrator lattice */}
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <GitBranch className="h-3.5 w-3.5 text-[#F97316]/70" />
+                <h5 className="text-[10px] uppercase tracking-wider text-white/30">
+                  Live Orchestrator DAG
+                </h5>
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-[#F97316]/80 border-[#F97316]/25 px-1.5"
+                >
+                  {seedOrchRecords.length} records
+                </Badge>
+              </div>
+              <div className="h-[320px] border border-[#F97316]/25 rounded-xl overflow-hidden bg-[#020202] orch-dag-glow">
+                {seedOrchRecords.length > 0 ? (
+                  <Suspense
+                    fallback={
+                      <div className="h-full skeleton-shimmer rounded-xl" />
+                    }
+                  >
+                    <DAGViewer records={seedOrchRecords} />
+                  </Suspense>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-[#F97316]" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Spawn Preview */}
       {!result && preview.data && selected.length > 0 && (

@@ -85,6 +85,62 @@ CHILD_AGENTS: dict[str, dict] = {
 }
 
 
+# ── Extra Child Agents (live spawn + schedule) ──────────────────────────────
+
+
+EXTRA_CHILD_AGENTS: dict[str, dict] = {
+    "marketing": {
+        "name": "Marketing Agent",
+        "alias_prefix": "arc-child-marketing",
+        "summary": "Growth + narrative + launch copy child",
+        "role": "marketing + growth specialist",
+        "color": "#F43F5E",
+    },
+    "finance": {
+        "name": "Finance Agent",
+        "alias_prefix": "arc-child-finance",
+        "summary": "Treasury + runway + sats-denominated P&L child",
+        "role": "finance + treasury specialist",
+        "color": "#14B8A6",
+    },
+    "security": {
+        "name": "Security Agent",
+        "alias_prefix": "arc-child-security",
+        "summary": "Key hygiene + red-team + inscription integrity child",
+        "role": "security + red-team specialist",
+        "color": "#EF4444",
+    },
+    "ops": {
+        "name": "Ops Agent",
+        "alias_prefix": "arc-child-ops",
+        "summary": "Infra + uptime + on-call playbook child",
+        "role": "ops + infra specialist",
+        "color": "#3B82F6",
+    },
+    "product": {
+        "name": "Product Agent",
+        "alias_prefix": "arc-child-product",
+        "summary": "Roadmap + PRD + cross-agent requirements child",
+        "role": "product + PRD specialist",
+        "color": "#F59E0B",
+    },
+    "community": {
+        "name": "Community Agent",
+        "alias_prefix": "arc-child-community",
+        "summary": "Community rituals + relays + mod playbook child",
+        "role": "community + relay specialist",
+        "color": "#D946EF",
+    },
+}
+
+
+def _all_kinds() -> dict[str, dict]:
+    merged: dict[str, dict] = {}
+    merged.update(CHILD_AGENTS)
+    merged.update(EXTRA_CHILD_AGENTS)
+    return merged
+
+
 # ── State Schema ──────────────────────────────────────────────────────────────
 
 
@@ -262,10 +318,11 @@ def plan_node(state: OrchestratorState) -> dict:
     children = state.get("children") or ["research", "codegen"]
     model = state.get("model", "llama3.2")
 
+    _catalog = _all_kinds()
     child_lines = "\n".join(
-        f"  - {k}: {CHILD_AGENTS[k]['name']} ({CHILD_AGENTS[k]['role']})"
+        f"  - {k}: {_catalog[k]['name']} ({_catalog[k]['role']})"
         for k in children
-        if k in CHILD_AGENTS
+        if k in _catalog
     )
     llm_prompt = (
         f"You are the ARC Protocol Meta-Agent orchestrator. Design the "
@@ -317,7 +374,7 @@ def spawn_node(state: OrchestratorState) -> dict:
     stamp = hex(int(_time.time()) & 0xFFFFFF)[2:]
 
     for ck in children:
-        cfg = CHILD_AGENTS.get(ck)
+        cfg = _all_kinds().get(ck)
         if not cfg:
             continue
         child_alias = f"{cfg['alias_prefix']}-{stamp}"
@@ -602,6 +659,20 @@ def list_child_agents() -> list[dict]:
     ]
 
 
+def list_extra_child_agents() -> list[dict]:
+    return [
+        {
+            "key": key,
+            "name": cfg["name"],
+            "summary": cfg["summary"],
+            "role": cfg["role"],
+            "color": cfg["color"],
+            "alias_prefix": cfg["alias_prefix"],
+        }
+        for key, cfg in EXTRA_CHILD_AGENTS.items()
+    ]
+
+
 def preview_spawn(
     prompt: str,
     children: list[str],
@@ -614,7 +685,7 @@ def preview_spawn(
     dag_refs = _find_full_dag(db)
     items = []
     for ck in children:
-        cfg = CHILD_AGENTS.get(ck)
+        cfg = _all_kinds().get(ck)
         if not cfg:
             continue
         items.append({
@@ -681,6 +752,314 @@ def run_orchestrator(
         "agent_pubkey": result.get("agent_pubkey", ""),
         "dispute_link": result.get("dispute_link", "/marketplace#demo"),
     }
+
+
+# ── Live Spawn + Schedule (exponential growth) ───────────────────────────────
+
+
+import json as _json
+import threading as _threading
+import time as _time
+
+
+SCHEDULE_FILE = arc.ARC_DIR / "orchestrator_schedule.json"
+SCHEDULE_INTERVAL_SECS = 6 * 60 * 60  # every 6h
+
+# Round-robin rotation for auto-spawns — cycles the extra catalog so the
+# ledger grows a new specialist every 6h without operator intervention.
+_SCHEDULE_ROTATION = [
+    "marketing", "finance", "security", "ops", "product", "community",
+]
+
+
+def _ensure_orchestrator_identity():
+    """Guarantee an orchestrator keypair + genesis record. Idempotent."""
+    db = arc.get_db()
+    alias = "arc-orchestrator"
+    key_file = arc.KEYS_DIR / f"{alias}.key"
+    if key_file.exists():
+        secret = bytes.fromhex(key_file.read_text().strip())
+    else:
+        try:
+            arc.generate_keypair(alias)
+        except Exception:
+            pass
+        if key_file.exists():
+            secret = bytes.fromhex(key_file.read_text().strip())
+        else:
+            secret = arc.load_key()
+    pubkey = arc.xonly_pubkey(secret).hex()
+    rows = arc.fetch_by_pubkey(db, pubkey)
+    if not rows:
+        genesis = arc.build_record(
+            "genesis", secret,
+            "Orchestrator / Meta-Agent initialized — LangGraph spawn-coordinator + ARC Protocol",
+            alias=alias,
+        )
+        if arc.verify_sig(genesis):
+            arc.store(db, genesis)
+    rows = arc.fetch_by_pubkey(db, pubkey)
+    head = rows[-1][0] if rows else ""
+    return db, secret, alias, pubkey, head
+
+
+def _spawn_single_child(db, parent_secret, parent_alias, parent_head, kind: str,
+                        trigger: str = "manual") -> dict:
+    """Spawn one child agent with full-DAG memref inheritance.
+
+    Returns a spawn record bundle (child metadata + new record ids). The
+    orchestrator's own action lineage is advanced by one record here (the
+    spawn attestation), so callers passing parent_head should update to the
+    returned ``orchestrator_spawn_id``.
+    """
+    catalog = _all_kinds()
+    cfg = catalog.get(kind)
+    if not cfg:
+        raise ValueError(f"unknown child kind: {kind}")
+
+    dag_refs = _find_full_dag(db)
+    stamp = hex(int(_time.time()) & 0xFFFFFFF)[2:]
+    child_alias = f"{cfg['alias_prefix']}-{stamp}"
+
+    try:
+        sec_hex, _ph = arc.generate_keypair(child_alias)
+        child_secret = bytes.fromhex(sec_hex)
+    except Exception:
+        key_file = arc.KEYS_DIR / f"{child_alias}.key"
+        if not key_file.exists():
+            raise
+        child_secret = bytes.fromhex(key_file.read_text().strip())
+    child_pub = arc.xonly_pubkey(child_secret).hex()
+
+    # Child GENESIS with mandatory full-DAG memref inheritance.
+    genesis_rec = arc.build_record(
+        "genesis", child_secret,
+        (
+            f"{cfg['name']} child spawned by arc-orchestrator — "
+            f"{cfg['role']} with full-mesh ARC provenance anchor "
+            f"({trigger})"
+        ),
+        memrefs=dag_refs[:12],
+        alias=child_alias,
+    )
+    if not arc.verify_sig(genesis_rec):
+        raise ValueError("Child genesis signature failed")
+    child_genesis_id = arc.store(db, genesis_rec)
+
+    # Orchestrator attests the spawn (advances orchestrator chain).
+    orch_action = arc.build_record(
+        "action", parent_secret,
+        f"Orchestrator spawn [{trigger}]: {cfg['name']} → {child_alias}",
+        prev=parent_head,
+        memrefs=[child_genesis_id] + dag_refs[:5],
+        ihash=arc.sha256hex(f"spawn:{kind}:{trigger}".encode()),
+        ohash=arc.sha256hex(f"child_pubkey:{child_pub}".encode()),
+        alias=parent_alias,
+    )
+    if not arc.verify_sig(orch_action):
+        raise ValueError("Orchestrator spawn signature failed")
+    orch_spawn_id = arc.store(db, orch_action)
+
+    # Child first action re-anchors the mesh.
+    child_ack = arc.build_record(
+        "action", child_secret,
+        f"{cfg['name']} child ack: full-DAG memref inherited, ready for work",
+        prev=child_genesis_id,
+        memrefs=dag_refs[:8] + [orch_spawn_id],
+        alias=child_alias,
+        ihash=arc.sha256hex(f"{child_alias}:ihash".encode()),
+        ohash=arc.sha256hex(f"{child_alias}:ack:{trigger}".encode()),
+    )
+    child_ack_id = arc.store(db, child_ack)
+
+    return {
+        "kind": kind,
+        "name": cfg["name"],
+        "role": cfg["role"],
+        "color": cfg["color"],
+        "alias": child_alias,
+        "pubkey": child_pub,
+        "genesis_id": child_genesis_id,
+        "ack_id": child_ack_id,
+        "orchestrator_spawn_id": orch_spawn_id,
+        "trigger": trigger,
+        "ts": int(_time.time()),
+    }
+
+
+def live_spawn_run(
+    kinds: Optional[list[str]] = None,
+    trigger: str = "live-spawn",
+) -> dict:
+    """Seed a live spawn run: inscribe 3 new children by default.
+
+    Each child gets a fresh BIP-340 keypair, a genesis record whose memrefs
+    bind the full live DAG, and an ack action. Orchestrator lineage is
+    advanced by one attestation per child.
+    """
+    kinds = kinds or ["marketing", "finance", "security"]
+    db, secret, alias, pubkey, head = _ensure_orchestrator_identity()
+
+    spawned: list[dict] = []
+    for kind in kinds:
+        child = _spawn_single_child(db, secret, alias, head, kind, trigger=trigger)
+        spawned.append(child)
+        head = child["orchestrator_spawn_id"]
+
+    dag_refs = _find_full_dag(db)
+    summary = (
+        f"Live spawn run [{trigger}]: {len(spawned)} child(ren) inscribed — "
+        + ", ".join(s["alias"] for s in spawned)
+    )
+
+    final_refs = dag_refs[:10] + [s["genesis_id"] for s in spawned]
+    seen: set[str] = set()
+    final_refs = [r for r in final_refs if not (r in seen or seen.add(r))]
+
+    final_rec = arc.build_record(
+        "action", secret, summary,
+        prev=head,
+        memrefs=final_refs,
+        alias=alias,
+        ihash=arc.sha256hex(f"live-spawn:{trigger}:{int(_time.time())}".encode()),
+        ohash=arc.sha256hex(summary.encode()),
+    )
+    if not arc.verify_sig(final_rec):
+        raise ValueError("Live spawn summary signature failed")
+    final_id = arc.store(db, final_rec)
+
+    return {
+        "trigger": trigger,
+        "spawned": spawned,
+        "summary_id": final_id,
+        "summary": summary,
+        "inscription_cmd": arc.inscription_envelope(final_rec),
+        "agent_pubkey": pubkey,
+        "dag_memrefs": dag_refs,
+        "ts": int(_time.time()),
+    }
+
+
+# ── Schedule state ──────────────────────────────────────────────────────────
+
+
+def _load_schedule_state() -> dict:
+    try:
+        if SCHEDULE_FILE.exists():
+            return _json.loads(SCHEDULE_FILE.read_text())
+    except Exception:
+        pass
+    return {
+        "enabled": True,
+        "interval_secs": SCHEDULE_INTERVAL_SECS,
+        "last_run": 0,
+        "rotation_index": 0,
+        "history": [],
+    }
+
+
+def _save_schedule_state(state: dict) -> None:
+    try:
+        SCHEDULE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SCHEDULE_FILE.write_text(_json.dumps(state, indent=2))
+    except Exception:
+        pass
+
+
+def schedule_status() -> dict:
+    state = _load_schedule_state()
+    now = int(_time.time())
+    last = int(state.get("last_run", 0))
+    interval = int(state.get("interval_secs", SCHEDULE_INTERVAL_SECS))
+    next_run = last + interval if last else now
+    idx = int(state.get("rotation_index", 0)) % len(_SCHEDULE_ROTATION)
+    next_kind = _SCHEDULE_ROTATION[idx]
+    return {
+        "enabled": bool(state.get("enabled", True)),
+        "interval_secs": interval,
+        "cron": "0 */6 * * *",
+        "last_run": last,
+        "next_run": next_run,
+        "seconds_until_next": max(0, next_run - now),
+        "next_kind": next_kind,
+        "rotation": _SCHEDULE_ROTATION,
+        "history": state.get("history", [])[-12:],
+    }
+
+
+def schedule_tick(force: bool = False) -> dict:
+    """Run a single scheduled spawn tick.
+
+    When ``force`` is True, runs regardless of elapsed time (used by the
+    manual "Tick now" button). Otherwise runs only if the 6h window elapsed.
+    """
+    state = _load_schedule_state()
+    now = int(_time.time())
+    last = int(state.get("last_run", 0))
+    interval = int(state.get("interval_secs", SCHEDULE_INTERVAL_SECS))
+
+    due = force or (now - last) >= interval or last == 0
+    if not due:
+        return {
+            "ran": False,
+            "reason": "not-due",
+            "next_run": last + interval,
+            "seconds_until_next": max(0, (last + interval) - now),
+        }
+
+    idx = int(state.get("rotation_index", 0)) % len(_SCHEDULE_ROTATION)
+    kind = _SCHEDULE_ROTATION[idx]
+
+    result = live_spawn_run([kind], trigger="schedule-6h")
+    child = result["spawned"][0] if result["spawned"] else None
+
+    state["last_run"] = now
+    state["rotation_index"] = (idx + 1) % len(_SCHEDULE_ROTATION)
+    hist = list(state.get("history", []))
+    hist.append({
+        "ts": now,
+        "kind": kind,
+        "alias": child["alias"] if child else "",
+        "genesis_id": child["genesis_id"] if child else "",
+        "summary_id": result["summary_id"],
+    })
+    state["history"] = hist[-50:]
+    _save_schedule_state(state)
+
+    return {
+        "ran": True,
+        "kind": kind,
+        "child": child,
+        "summary_id": result["summary_id"],
+        "next_run": now + interval,
+        "seconds_until_next": interval,
+    }
+
+
+_SCHEDULER_THREAD: Optional[_threading.Thread] = None
+_SCHEDULER_STOP = _threading.Event()
+
+
+def _scheduler_loop():
+    """Background thread that fires schedule_tick every 60s when due."""
+    while not _SCHEDULER_STOP.is_set():
+        try:
+            schedule_tick(force=False)
+        except Exception:
+            pass
+        _SCHEDULER_STOP.wait(60)
+
+
+def start_scheduler() -> bool:
+    """Start the background scheduler thread. Idempotent."""
+    global _SCHEDULER_THREAD
+    if _SCHEDULER_THREAD and _SCHEDULER_THREAD.is_alive():
+        return False
+    _SCHEDULER_STOP.clear()
+    t = _threading.Thread(target=_scheduler_loop, daemon=True, name="arc-orch-scheduler")
+    t.start()
+    _SCHEDULER_THREAD = t
+    return True
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

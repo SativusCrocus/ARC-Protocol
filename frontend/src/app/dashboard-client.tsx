@@ -147,6 +147,12 @@ function detectAgentType(alias?: string, actions?: string[]) {
     ca.aliases.some((al) => a === al)
   );
   if (byAlias) return byAlias;
+  // Live-spawn "arc-child-<kind>-<stamp>" (marketing, finance, security, ...)
+  // map to the Orchestrator certified entry so they color/glow in sync.
+  if (a.startsWith("arc-child-")) {
+    const orch = CERTIFIED_AGENTS.find((ca) => ca.id === "orchestrator");
+    if (orch) return orch;
+  }
   // Orchestrator-spawned children: "arc-<kind>-child-<stamp>" inherit color.
   const childMatch = a.match(/^arc-(research|codegen|trader|legal|design|support|compliance|data)-child/);
   if (childMatch) {

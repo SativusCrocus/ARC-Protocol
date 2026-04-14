@@ -543,3 +543,55 @@ export interface OrchestratorVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Live Spawn + Schedule ────────────────────────────────────────────────────
+
+export interface LiveSpawnResult {
+  trigger: string;
+  spawned: OrchestratorSpawnedChild[];
+  summary_id: string;
+  summary: string;
+  inscription_cmd: string;
+  agent_pubkey: string;
+  dag_memrefs: string[];
+  ts: number;
+}
+
+export interface ScheduleHistoryEntry {
+  ts: number;
+  kind: string;
+  alias: string;
+  genesis_id: string;
+  summary_id: string;
+}
+
+export interface ScheduleStatus {
+  enabled: boolean;
+  interval_secs: number;
+  cron: string;
+  last_run: number;
+  next_run: number;
+  seconds_until_next: number;
+  next_kind: string;
+  rotation: string[];
+  history: ScheduleHistoryEntry[];
+  just_fired?: {
+    ran: boolean;
+    kind?: string;
+    child?: OrchestratorSpawnedChild;
+    summary_id?: string;
+  };
+}
+
+export interface ScheduleTickResult {
+  tick: {
+    ran: boolean;
+    reason?: string;
+    kind?: string;
+    child?: OrchestratorSpawnedChild;
+    summary_id?: string;
+    next_run: number;
+    seconds_until_next: number;
+  };
+  status: ScheduleStatus;
+}
