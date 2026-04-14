@@ -23,6 +23,11 @@ import type {
   LegalChainResult,
   LegalTemplate,
   LegalVerifyResult,
+  DesignResult,
+  DesignChainResult,
+  DesignVerifyResult,
+  DesignStyle,
+  DesignAspectRatio,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -207,4 +212,27 @@ export const api = {
 
   legalVerify: (id: string) =>
     request<LegalVerifyResult>(`/legal/verify/${id}`),
+
+  // ── Design & Images ──────────────────────────────────────────────────────
+  designStyles: () =>
+    request<{ styles: DesignStyle[]; aspect_ratios: DesignAspectRatio[] }>(
+      "/design/styles",
+    ),
+
+  design: (data: {
+    prompt: string;
+    style?: string;
+    aspect_ratio?: string;
+    model?: string;
+  }) =>
+    request<DesignResult>("/design", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  designChain: (id: string) =>
+    request<DesignChainResult>(`/design/chain/${id}`),
+
+  designVerify: (id: string) =>
+    request<DesignVerifyResult>(`/design/verify/${id}`),
 };

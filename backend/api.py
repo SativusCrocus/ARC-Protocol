@@ -25,6 +25,7 @@ import research_agent as ra
 import codegen_agent as cg
 import trader_agent as ta
 import legal_agent as la
+import design_agent as da
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -933,6 +934,121 @@ def legal_verify(request: Request, record_id: str):
     }
 
 
+# ── Design & Images Agent ────────────────────────────────────────────────────
+
+
+SUPPORTED_STYLES = {
+    "photorealistic", "cyberpunk", "abstract", "anime", "minimalist", "retrofuturist",
+}
+SUPPORTED_ASPECTS = {"1:1", "16:9", "9:16", "4:3", "3:4"}
+
+
+class DesignReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    style: str = Field("abstract", max_length=32)
+    aspect_ratio: str = Field("1:1", max_length=8)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("style")
+    @classmethod
+    def validate_style(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_STYLES:
+            raise ValueError(
+                f"style must be one of: {', '.join(sorted(SUPPORTED_STYLES))}"
+            )
+        return v
+
+    @field_validator("aspect_ratio")
+    @classmethod
+    def validate_aspect(cls, v: str) -> str:
+        if v not in SUPPORTED_ASPECTS:
+            raise ValueError(
+                f"aspect_ratio must be one of: {', '.join(sorted(SUPPORTED_ASPECTS))}"
+            )
+        return v
+
+
+@app.get("/design/styles")
+@limiter.limit("60/minute")
+def design_styles(request: Request):
+    """Return available design styles + aspect ratios."""
+    return {
+        "styles": da.list_styles(),
+        "aspect_ratios": da.list_aspect_ratios(),
+    }
+
+
+@app.post("/design")
+@limiter.limit("5/minute")
+def design(request: Request, req: DesignReq):
+    """Run LangGraph design-&-images agent with cross-agent ARC inscriptions."""
+    try:
+        return da.run_design(
+            prompt=req.prompt,
+            style=req.style,
+            aspect_ratio=req.aspect_ratio,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Design agent error: {str(e)}")
+
+
+@app.get("/design/chain/{record_id}")
+@limiter.limit("60/minute")
+def design_chain(request: Request, record_id: str):
+    """Fetch the full design chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/design/verify/{record_id}")
+@limiter.limit("60/minute")
+def design_verify(request: Request, record_id: str):
+    """Deep-verify a design record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -1092,6 +1208,26 @@ _SEED_AGENTS = [
         "settlements": [
             ("Legal drafting service: NDA package \u2014 ARC-anchored", 15000),
             ("Legal drafting service: Service Agreement + compliance memo", 22000),
+        ],
+    },
+    {
+        "alias": "arc-design",
+        "genesis": "Design & Images agent initialized \u2014 LangGraph + Flux/Ollama + ARC cross-agent image provenance",
+        "actions": [
+            "Prompt expansion (Cyberpunk): luminous Bitcoin ordinal over Lightning mesh under synthwave sunset",
+            "Generative design render (Cyberpunk, 16:9): ipfs://bafkreihb... \u2014 Research + Codegen memrefs",
+            "Design caption: Synthwave ordinal mesh \u2014 on-chain art anchored to the full ARC DAG",
+            "Prompt expansion (Minimalist): ARC Certified Agents badge set \u2014 flat Swiss composition",
+            "Generative design render (Minimalist, 1:1): ipfs://bafkreiab... \u2014 Legal memref anchor",
+            "Prompt expansion (Retrofuturist): Lightning Network 1985 poster \u2014 grid horizon + neon",
+            "Generative design render (Retrofuturist, 3:4): ipfs://bafkreixy... \u2014 Trader memref anchor",
+            "Style analysis: Abstract + Cyberpunk hybrid for onboarding hero \u2014 palette study",
+            "Generative design render (Anime, 9:16): ordinal inscription scene \u2014 marketplace asset",
+            "Generative design finalized: ARC Protocol launch hero \u2014 cross-agent memref anchor",
+        ],
+        "settlements": [
+            ("Design commission: Hero poster + IPFS hosting bundle \u2014 ARC-anchored", 12000),
+            ("Design commission: Agent avatar pack \u2014 5 styles, ARC-anchored", 8500),
         ],
     },
 ]

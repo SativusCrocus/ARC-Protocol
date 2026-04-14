@@ -443,3 +443,81 @@
       transparent 100%);
   border-left: 2px solid rgba(234, 179, 8, 0.25);
 }
+
+/* ── Design & Images Agent (#EC4899) ─────────────────────────────────── */
+
+.design-card-glow {
+  box-shadow:
+    inset 0 0 30px rgba(236, 72, 153, 0.02),
+    0 0 60px rgba(236, 72, 153, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+.design-card-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(236, 72, 153, 0.05),
+    0 0 80px rgba(236, 72, 153, 0.06);
+}
+
+.design-dag-glow {
+  box-shadow:
+    0 0 40px rgba(236, 72, 153, 0.07),
+    inset 0 0 40px rgba(236, 72, 153, 0.02);
+  animation: design-dag-breathe 4s ease-in-out infinite;
+}
+
+@keyframes design-dag-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(236, 72, 153, 0.07),
+      inset 0 0 40px rgba(236, 72, 153, 0.02);
+  }
+  50% {
+    box-shadow:
+      0 0 80px rgba(236, 72, 153, 0.13),
+      inset 0 0 60px rgba(236, 72, 153, 0.06);
+  }
+}
+
+.design-btn-glow {
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+.design-btn-glow:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(236, 72, 153, 0.45);
+}
+
+.design-image-frame {
+  position: relative;
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(236, 72, 153, 0.08), transparent 60%),
+    #020202;
+  box-shadow:
+    0 0 40px rgba(236, 72, 153, 0.1),
+    inset 0 0 30px rgba(236, 72, 153, 0.04);
+}
+.design-image-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(236, 72, 153, 0.08) 0%,
+    transparent 35%,
+    transparent 65%,
+    rgba(0, 240, 255, 0.05) 100%
+  );
+  mix-blend-mode: screen;
+}
+
+.design-cid-pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: rgba(236, 72, 153, 0.85);
+  background: rgba(236, 72, 153, 0.08);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  border-radius: 999px;
+  padding: 4px 10px;
+}

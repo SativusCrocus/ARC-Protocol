@@ -262,3 +262,54 @@ export interface LegalVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Design & Images Agent Types ─────────────────────────────────────────────
+
+export interface DesignStyle {
+  key: string;
+  name: string;
+  prompt_prefix: string;
+  palette: string[];
+}
+
+export interface DesignAspectRatio {
+  key: string;
+  width: number;
+  height: number;
+}
+
+export interface DesignResult {
+  prompt: string;
+  style: string;
+  style_name: string;
+  aspect_ratio: string;
+  width: number;
+  height: number;
+  expanded_prompt: string;
+  caption: string;
+  svg: string;
+  image_cid: string;
+  image_uri: string;
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+}
+
+export interface DesignChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface DesignVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

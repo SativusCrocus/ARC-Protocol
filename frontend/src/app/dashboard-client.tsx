@@ -28,6 +28,7 @@ import {
   Shield,
   Link2,
   Scale,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const filterTabs = [
@@ -80,6 +81,16 @@ const CERTIFIED_AGENTS = [
     desc: "NDA / Service / License drafting \u2014 cross-agent memrefs + compliance",
     aliases: ["arc-legal"],
     keywords: ["legal", "arc-legal", "contract"],
+  },
+  {
+    id: "design",
+    name: "Design & Images",
+    href: "/design",
+    icon: ImageIcon,
+    color: "#EC4899",
+    desc: "Generative design \u2014 Flux/Ollama prompts, IPFS CIDs, full DAG anchor",
+    aliases: ["arc-design"],
+    keywords: ["design", "arc-design", "image", "generative"],
   },
 ];
 
@@ -396,7 +407,7 @@ export function Dashboard({
             ARC Certified Agents
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           {certifiedStats.map(
             ({
               id,

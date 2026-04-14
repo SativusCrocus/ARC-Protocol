@@ -19,6 +19,7 @@ import {
   Code2,
   TrendingUp,
   Scale,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const links = [
@@ -27,6 +28,7 @@ const links = [
   { href: "/codegen", label: "Code Generator", icon: Code2 },
   { href: "/trader", label: "DeFi Trader", icon: TrendingUp },
   { href: "/legal", label: "Legal Contracts", icon: Scale },
+  { href: "/design", label: "Design & Images", icon: ImageIcon },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },
