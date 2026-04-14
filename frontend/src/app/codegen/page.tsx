@@ -272,7 +272,7 @@ export default function CodegenPage() {
       </div>
 
       {/* Prompt Form */}
-      <Card className="border-white/[0.06] bg-[#0a0a0a]">
+      <Card className="border-white/[0.06] bg-[#0a0a0a] codegen-card-glow">
         <CardContent className="p-4">
           <form onSubmit={handleSubmit} className="space-y-3">
             {/* Prompt Input */}
@@ -339,7 +339,7 @@ export default function CodegenPage() {
               <Button
                 type="submit"
                 disabled={!prompt.trim() || mutation.isPending}
-                className="bg-[#a855f7]/10 border border-[#a855f7]/20 text-[#a855f7] hover:bg-[#a855f7]/20 disabled:opacity-30"
+                className="bg-[#a855f7]/10 border border-[#a855f7]/20 text-[#a855f7] hover:bg-[#a855f7]/20 disabled:opacity-30 codegen-btn-glow"
               >
                 {mutation.isPending ? (
                   <>
@@ -555,7 +555,7 @@ export default function CodegenPage() {
                 </span>
               </div>
             </div>
-            <div className="h-[400px] border border-white/[0.04] rounded-xl overflow-hidden bg-[#020202]">
+            <div className="h-[400px] border border-[#a855f7]/10 rounded-xl overflow-hidden bg-[#020202] codegen-dag-glow">
               {allRecords.length > 0 ? (
                 <Suspense
                   fallback={

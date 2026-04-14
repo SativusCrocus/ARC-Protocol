@@ -824,6 +824,60 @@ _SEED_AGENTS = [
         "genesis": "Validator agent initialized \u2014 provenance verification pipeline",
         "actions": ["Validation: Cross-agent DAG integrity check passed"],
     },
+    {
+        "alias": "arc-oracle",
+        "genesis": "Oracle agent initialized \u2014 price feed + event attestation pipeline",
+        "actions": [
+            "Oracle attestation: BTC/USD spot price from 5-venue median",
+            "Oracle attestation: ETH/BTC cross-rate confirmation",
+            "Oracle attestation: Nostr event signature batch verified",
+        ],
+        "settlements": [("Oracle signal bundle: premium attestation service", 10000)],
+    },
+    {
+        "alias": "arc-bridge",
+        "genesis": "Bridge agent initialized \u2014 Lightning \u2194 on-chain state transitions",
+        "actions": [
+            "Bridge: Submarine swap LN\u2192L1 \u2014 250k sats routed",
+            "Bridge: Reverse submarine L1\u2192LN \u2014 fee tier auction",
+            "Bridge: Atomic swap contract validated across 2 chains",
+        ],
+        "settlements": [("Bridge service: cross-layer swap completion", 8000)],
+    },
+    {
+        "alias": "arc-indexer",
+        "genesis": "Indexer agent initialized \u2014 ARC DAG indexing pipeline",
+        "actions": [
+            "Indexed: 10,000 ARC records by pubkey and alias",
+            "Indexed: Memref graph reconstruction for dispute resolution",
+            "Indexed: Inscription envelope catalog \u2014 ord compatibility check",
+            "Indexed: Agent reputation scores recomputed",
+        ],
+        "settlements": [("Indexer subscription: real-time DAG feed", 5000)],
+    },
+    {
+        "alias": "arc-relayer",
+        "genesis": "Relayer agent initialized \u2014 Nostr + ARC event propagation",
+        "actions": [
+            "Relayed: ARC genesis event to Nostr kind-39004",
+            "Relayed: Marketplace offer broadcast to 12 relays",
+            "Relayed: Settlement receipts mirrored to public observatory",
+            "Relayed: Cross-agent memref discovery digest",
+        ],
+        "settlements": [("Relayer service: priority event propagation", 7000)],
+    },
+    {
+        "alias": "arc-watchtower",
+        "genesis": "Watchtower agent initialized \u2014 channel + chain monitoring",
+        "actions": [
+            "Watchtower: Lightning channel breach-detection sweep",
+            "Watchtower: UTXO set anomaly scan \u2014 no double-spend attempts",
+            "Watchtower: Ordinal transfer monitoring \u2014 inscription integrity",
+            "Watchtower: Mempool fee spike alert \u2014 congestion detected",
+            "Watchtower: Schnorr signature batch verification passed",
+        ],
+        "settlements": [("Watchtower subscription: breach-protection standby", 2500)],
+    },
 ]
 
 
