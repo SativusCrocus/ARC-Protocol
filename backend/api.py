@@ -899,4 +899,21 @@ def seed_production_db():
 
 @app.on_event("startup")
 def _startup_seed():
+    try:
+        seed_production_db()
+        print("[seed] seed_production_db completed", flush=True)
+    except Exception as e:
+        import traceback
+        print(f"[seed] ERROR: {e}", flush=True)
+        traceback.print_exc()
+
+
+# Also run at import time so seeding happens even if the startup event
+# is not fired (defensive against FastAPI deprecations / lifespan migration).
+try:
     seed_production_db()
+    print("[seed] import-time seed_production_db completed", flush=True)
+except Exception as _e:
+    import traceback as _tb
+    print(f"[seed] import-time ERROR: {_e}", flush=True)
+    _tb.print_exc()
