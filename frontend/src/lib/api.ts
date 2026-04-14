@@ -40,6 +40,11 @@ import type {
   DataChainResult,
   DataVerifyResult,
   DataAnalysisType,
+  OrchestratorChildAgent,
+  OrchestratorPreviewResult,
+  OrchestratorResult,
+  OrchestratorChainResult,
+  OrchestratorVerifyResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -313,4 +318,30 @@ export const api = {
 
   dataVerify: (id: string) =>
     request<DataVerifyResult>(`/data/verify/${id}`),
+
+  // ── Orchestrator / Meta-Agent ──────────────────────────────────────────
+  orchestratorChildren: () =>
+    request<{ children: OrchestratorChildAgent[] }>("/orchestrator/children"),
+
+  orchestratorPreview: (data: { prompt: string; children: string[] }) =>
+    request<OrchestratorPreviewResult>("/orchestrator/preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  orchestrator: (data: {
+    prompt: string;
+    children: string[];
+    model?: string;
+  }) =>
+    request<OrchestratorResult>("/orchestrator", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  orchestratorChain: (id: string) =>
+    request<OrchestratorChainResult>(`/orchestrator/chain/${id}`),
+
+  orchestratorVerify: (id: string) =>
+    request<OrchestratorVerifyResult>(`/orchestrator/verify/${id}`),
 };

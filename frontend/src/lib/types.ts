@@ -465,3 +465,81 @@ export interface DataVerifyResult {
   alias: string;
   inscription_cmd: string;
 }
+
+// ── Orchestrator / Meta-Agent Types ─────────────────────────────────────────
+
+export interface OrchestratorChildAgent {
+  key: string;
+  name: string;
+  summary: string;
+  role: string;
+  color: string;
+  alias_prefix: string;
+}
+
+export interface OrchestratorPreviewItem {
+  kind: string;
+  name: string;
+  role: string;
+  color: string;
+  alias_prefix: string;
+  mandatory_memrefs: string[];
+}
+
+export interface OrchestratorPreviewResult {
+  prompt: string;
+  children: OrchestratorPreviewItem[];
+  dag_memref_count: number;
+  certified_anchors: string[];
+}
+
+export interface OrchestratorSpawnedChild {
+  kind: string;
+  name: string;
+  role: string;
+  color: string;
+  alias: string;
+  pubkey: string;
+  genesis_id: string;
+  ack_id: string;
+  orchestrator_spawn_id: string;
+}
+
+export interface OrchestratorFinding {
+  phase: "plan" | "dispatch" | "aggregate" | "report";
+  text: string;
+}
+
+export interface OrchestratorResult {
+  prompt: string;
+  children: string[];
+  plan: string;
+  dispatch: string;
+  aggregate: string;
+  report: string;
+  findings: OrchestratorFinding[];
+  spawned: OrchestratorSpawnedChild[];
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface OrchestratorChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface OrchestratorVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}

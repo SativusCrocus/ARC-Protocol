@@ -31,6 +31,7 @@ import {
   Image as ImageIcon,
   HelpCircle,
   BarChart,
+  Network,
 } from "lucide-react";
 
 const filterTabs = [
@@ -124,6 +125,16 @@ const CERTIFIED_AGENTS = [
     aliases: ["arc-data"],
     keywords: ["data", "arc-data", "analysis", "analytics", "trends"],
   },
+  {
+    id: "orchestrator",
+    name: "Orchestrator",
+    href: "/orchestrator",
+    icon: Network,
+    color: "#F97316",
+    desc: "Meta-agent \u2014 spawns children on demand with mandatory full-DAG memref inheritance",
+    aliases: ["arc-orchestrator"],
+    keywords: ["orchestrator", "arc-orchestrator", "meta", "spawn"],
+  },
 ];
 
 const CERTIFIED_ALIAS_SET = new Set(
@@ -136,6 +147,24 @@ function detectAgentType(alias?: string, actions?: string[]) {
     ca.aliases.some((al) => a === al)
   );
   if (byAlias) return byAlias;
+  // Orchestrator-spawned children: "arc-<kind>-child-<stamp>" inherit color.
+  const childMatch = a.match(/^arc-(research|codegen|trader|legal|design|support|compliance|data)-child/);
+  if (childMatch) {
+    const kind = childMatch[1];
+    const aliasMap: Record<string, string> = {
+      research: "arc-deep-research",
+      codegen: "arc-codegen",
+      trader: "arc-defi-trader",
+      legal: "arc-legal",
+      design: "arc-design",
+      support: "arc-support",
+      compliance: "arc-compliance",
+      data: "arc-data",
+    };
+    const target = aliasMap[kind];
+    const parent = CERTIFIED_AGENTS.find((ca) => ca.aliases.includes(target));
+    if (parent) return parent;
+  }
   // Soft colouring for sub-agents in Global Index
   if (a.startsWith("arc-research") || a === "arc-synthesis" || a === "arc-composer" || a === "arc-analyst")
     return CERTIFIED_AGENTS[0];

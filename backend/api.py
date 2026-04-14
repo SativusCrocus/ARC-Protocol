@@ -29,6 +29,7 @@ import design_agent as da
 import support_agent as sa
 import compliance_agent as coa
 import data_agent as dta
+import orchestrator_agent as oa
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -1389,6 +1390,138 @@ def data_verify(request: Request, record_id: str):
     }
 
 
+# ── Orchestrator / Meta-Agent ───────────────────────────────────────────────
+
+
+SUPPORTED_CHILDREN = {
+    "research", "codegen", "trader", "legal",
+    "design", "support", "compliance", "data",
+}
+
+
+class OrchestratorReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    children: list[str] = Field(default_factory=lambda: ["research", "codegen"])
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("children")
+    @classmethod
+    def validate_children(cls, v: list[str]) -> list[str]:
+        if not v:
+            raise ValueError("children must be a non-empty list")
+        if len(v) > 8:
+            raise ValueError("at most 8 children per orchestration")
+        out: list[str] = []
+        for ck in v:
+            cl = ck.lower().strip()
+            if cl not in SUPPORTED_CHILDREN:
+                raise ValueError(
+                    f"child '{ck}' unsupported. Allowed: "
+                    f"{', '.join(sorted(SUPPORTED_CHILDREN))}"
+                )
+            if cl not in out:
+                out.append(cl)
+        return out
+
+
+class OrchestratorPreviewReq(BaseModel):
+    prompt: str = Field("", max_length=65536)
+    children: list[str] = Field(default_factory=lambda: ["research", "codegen"])
+
+    @field_validator("children")
+    @classmethod
+    def validate_children(cls, v: list[str]) -> list[str]:
+        return OrchestratorReq.validate_children(v)
+
+
+@app.get("/orchestrator/children")
+@limiter.limit("60/minute")
+def orchestrator_children(request: Request):
+    """Return the available child-agent catalog for the orchestrator UI."""
+    return {"children": oa.list_child_agents()}
+
+
+@app.post("/orchestrator/preview")
+@limiter.limit("30/minute")
+def orchestrator_preview(request: Request, req: OrchestratorPreviewReq):
+    """Return a read-only preview of what a spawn would look like."""
+    try:
+        return oa.preview_spawn(prompt=req.prompt, children=req.children)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Orchestrator preview error: {str(e)}")
+
+
+@app.post("/orchestrator")
+@limiter.limit("3/minute")
+def orchestrator(request: Request, req: OrchestratorReq):
+    """Run the orchestrator meta-agent — spawns children + inscribes."""
+    try:
+        return oa.run_orchestrator(
+            prompt=req.prompt,
+            children=req.children,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Orchestrator error: {str(e)}")
+
+
+@app.get("/orchestrator/chain/{record_id}")
+@limiter.limit("60/minute")
+def orchestrator_chain(request: Request, record_id: str):
+    """Fetch the orchestrator chain + every memref'd record (spawn map)."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/orchestrator/verify/{record_id}")
+@limiter.limit("60/minute")
+def orchestrator_verify(request: Request, record_id: str):
+    """Deep-verify an orchestrator record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Production Seed ──────────────────────────────────────────────────────────
 
 
@@ -1659,6 +1792,37 @@ _SEED_AGENTS = [
             ("Data tier: Trends attestation bundle \u2014 ARC-anchored", 8500),
             ("Data tier: Correlations + anomaly package \u2014 ARC-anchored", 12500),
             ("Data tier: Full-mesh analytic summary \u2014 cross-agent package", 16500),
+        ],
+    },
+    {
+        "alias": "arc-orchestrator",
+        "genesis": "Orchestrator / Meta-Agent initialized \u2014 LangGraph spawn-coordinator + ARC full-mesh anchoring",
+        "actions": [
+            "Orchestrator plan: multi-agent research + codegen sprint \u2014 Lightning settlement reference impl",
+            "Orchestrator spawn: Deep Research child \u2014 full-DAG memref inherited",
+            "Orchestrator spawn: Code Generator child \u2014 full-DAG memref inherited",
+            "Orchestrator dispatch: 2 child(ren) with scoped sub-task bundles",
+            "Orchestrator aggregate: research + codegen outputs \u2014 cross-memref witness",
+            "Orchestrator meta-inscription: full-mesh DAG anchor \u2014 research + codegen",
+            "Orchestrator plan: compliance + data corroboration sweep across all certified agents",
+            "Orchestrator spawn: Compliance child \u2014 regulatory + provenance posture",
+            "Orchestrator spawn: Data Analysis child \u2014 mesh telemetry correlation",
+            "Orchestrator dispatch: 2 child(ren) compliance + data \u2014 full-DAG anchor enforced",
+            "Orchestrator aggregate: compliance-pass + data-corroborated \u2014 zero-tamper delta",
+            "Orchestrator meta-inscription: compliance + data \u2014 full-mesh anchor",
+            "Orchestrator plan: end-to-end product launch \u2014 design + legal + support + trader",
+            "Orchestrator spawn: Design child \u2014 launch hero asset pack",
+            "Orchestrator spawn: Legal child \u2014 launch-day contract bundle",
+            "Orchestrator spawn: Support child \u2014 day-one triage playbook",
+            "Orchestrator spawn: Trader child \u2014 launch-day market probe",
+            "Orchestrator aggregate: 4-child launch bundle \u2014 cross-memref witness",
+            "Orchestrator meta-inscription: launch bundle \u2014 full-mesh anchor",
+            "Orchestrator meta-audit: spawn ledger integrity \u2014 all child genesis records anchored to full DAG",
+        ],
+        "settlements": [
+            ("Orchestrator tier: 2-child spawn bundle \u2014 ARC-anchored", 11000),
+            ("Orchestrator tier: 4-child launch bundle \u2014 cross-agent package", 22000),
+            ("Orchestrator tier: full-mesh meta-orchestration \u2014 ARC-anchored", 35000),
         ],
     },
 ]
