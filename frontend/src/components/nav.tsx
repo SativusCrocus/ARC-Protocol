@@ -24,6 +24,7 @@ import {
   Shield,
   BarChart,
   Network,
+  FileText,
 } from "lucide-react";
 
 const links = [
@@ -37,6 +38,7 @@ const links = [
   { href: "/compliance", label: "Compliance & Audit", icon: Shield },
   { href: "/data", label: "Data Analysis", icon: BarChart },
   { href: "/orchestrator", label: "Orchestrator", icon: Network },
+  { href: "/content", label: "Content Creator", icon: FileText },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },

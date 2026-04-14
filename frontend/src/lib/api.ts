@@ -40,6 +40,10 @@ import type {
   DataChainResult,
   DataVerifyResult,
   DataAnalysisType,
+  ContentCreatorResult,
+  ContentCreatorChainResult,
+  ContentCreatorVerifyResult,
+  ContentFormatSpec,
   OrchestratorChildAgent,
   OrchestratorPreviewResult,
   OrchestratorResult,
@@ -321,6 +325,28 @@ export const api = {
 
   dataVerify: (id: string) =>
     request<DataVerifyResult>(`/data/verify/${id}`),
+
+  // ── Content Creator Agent ──────────────────────────────────────────────
+  contentFormats: () =>
+    request<{ formats: ContentFormatSpec[] }>("/content-agent/formats"),
+
+  contentCreate: (data: {
+    prompt: string;
+    content_format?: string;
+    audience?: string;
+    price_sats?: number;
+    model?: string;
+  }) =>
+    request<ContentCreatorResult>("/content-agent", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  contentChain: (id: string) =>
+    request<ContentCreatorChainResult>(`/content-agent/chain/${id}`),
+
+  contentVerify: (id: string) =>
+    request<ContentCreatorVerifyResult>(`/content-agent/verify/${id}`),
 
   // ── Orchestrator / Meta-Agent ──────────────────────────────────────────
   orchestratorChildren: () =>

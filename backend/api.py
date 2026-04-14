@@ -30,6 +30,7 @@ import support_agent as sa
 import compliance_agent as coa
 import data_agent as dta
 import orchestrator_agent as oa
+import content_agent as cta
 
 # Structured logging so Vercel/Railway surface tracebacks instead of
 # a bare "Internal Server Error" with no detail.
@@ -1390,6 +1391,111 @@ def data_verify(request: Request, record_id: str):
     }
 
 
+# ── Content Creator Agent ───────────────────────────────────────────────────
+
+
+SUPPORTED_CONTENT_FORMATS = {
+    "article", "twitter_thread", "video_script", "newsletter",
+}
+
+
+class ContentCreatorReq(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=65536)
+    content_format: str = Field("article", max_length=32)
+    audience: str = Field("", max_length=256)
+    price_sats: int = Field(9500, ge=0, le=10_000_000_000)
+    model: str = Field("llama3.2", max_length=64)
+
+    @field_validator("content_format")
+    @classmethod
+    def validate_format(cls, v: str) -> str:
+        v = v.lower()
+        if v not in SUPPORTED_CONTENT_FORMATS:
+            raise ValueError(
+                f"content_format must be one of: "
+                f"{', '.join(sorted(SUPPORTED_CONTENT_FORMATS))}"
+            )
+        return v
+
+
+@app.get("/content-agent/formats")
+@limiter.limit("60/minute")
+def content_agent_formats(request: Request):
+    """Return the available content formats + structural recipes."""
+    return {"formats": cta.list_content_formats()}
+
+
+@app.post("/content-agent")
+@limiter.limit("5/minute")
+def content_agent_run(request: Request, req: ContentCreatorReq):
+    """Run the LangGraph content creator agent with full-mesh ARC inscription."""
+    try:
+        return cta.run_content_creator(
+            prompt=req.prompt,
+            content_format=req.content_format,
+            audience=req.audience,
+            price_sats=req.price_sats,
+            model=req.model,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Content agent error: {str(e)}")
+
+
+@app.get("/content-agent/chain/{record_id}")
+@limiter.limit("60/minute")
+def content_agent_chain(request: Request, record_id: str):
+    """Fetch the full content creator chain + cross-agent memref targets."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    chain = []
+    cur = record_id
+    while cur:
+        r = arc.fetch(db, cur)
+        if not r:
+            break
+        chain.append({"id": cur, "record": r})
+        cur = r.get("prev")
+    chain.reverse()
+    memref_records = []
+    seen = set(item["id"] for item in chain)
+    for item in chain:
+        for mref in item["record"].get("memrefs", []):
+            if mref not in seen:
+                mr = arc.fetch(db, mref)
+                if mr:
+                    memref_records.append({"id": mref, "record": mr})
+                    seen.add(mref)
+    return {"chain": chain, "memref_records": memref_records}
+
+
+@app.get("/content-agent/verify/{record_id}")
+@limiter.limit("60/minute")
+def content_agent_verify(request: Request, record_id: str):
+    """Deep-verify a content record: signature + full chain + memrefs."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    record = arc.fetch(db, record_id)
+    if not record:
+        raise HTTPException(404, "Record not found")
+    errs = arc.validate(db, record_id, True)
+    sig_ok = arc.verify_sig(record)
+    return {
+        "id": record_id,
+        "valid": len(errs) == 0 and sig_ok,
+        "signature_valid": sig_ok,
+        "errors": errs,
+        "memref_count": len(record.get("memrefs", [])),
+        "action": record.get("action", ""),
+        "alias": record.get("agent", {}).get("alias", ""),
+        "inscription_cmd": arc.inscription_envelope(record),
+    }
+
+
 # ── Orchestrator / Meta-Agent ───────────────────────────────────────────────
 
 
@@ -1871,6 +1977,38 @@ _SEED_AGENTS = [
             ("Data tier: Trends attestation bundle \u2014 ARC-anchored", 8500),
             ("Data tier: Correlations + anomaly package \u2014 ARC-anchored", 12500),
             ("Data tier: Full-mesh analytic summary \u2014 cross-agent package", 16500),
+        ],
+    },
+    {
+        "alias": "arc-content",
+        "genesis": "Content Creator agent initialized \u2014 LangGraph + Ollama + ARC full-mesh anchor for every article, thread, script, and newsletter",
+        "actions": [
+            "Content research (Article): Bitcoin-native agent provenance \u2014 DAG walk across arc-deep-research + arc-data",
+            "Content draft (Article): first pass \u2014 cross-agent memref citations inline",
+            "Content refine (Article): ruthless editorial pass \u2014 weak-verb kill + hook escalation",
+            "Content polish (Article): ship-ready pass \u2014 Lightning settlement CTA embedded",
+            "Content inscribed (Article): 9-agent memref bundle \u2014 full-mesh provenance anchor",
+            "Content research (Twitter Thread): why autonomous agents need ARC inscriptions \u2014 arc-defi-trader + arc-compliance corroboration",
+            "Content draft (Twitter Thread): 12-tweet spine \u2014 per-tweet memref attestation",
+            "Content refine (Twitter Thread): hook + payoff restructure \u2014 under 260 chars each",
+            "Content polish (Twitter Thread): CTA tweet + inscription-cmd footer",
+            "Content inscribed (Twitter Thread): full-mesh thread anchor \u2014 cross-agent memref witness",
+            "Content research (Video Script): Lightning-settled AI services \u2014 arc-codegen + arc-design + arc-trader inputs",
+            "Content draft (Video Script): cold-open + 4 beats + on-chain attestation overlay",
+            "Content refine (Video Script): B-roll cues tightened \u2014 timing trimmed to 3:45",
+            "Content polish (Video Script): narration + CTA + inscription block baked in",
+            "Content inscribed (Video Script): full-mesh script anchor \u2014 cross-agent memref witness",
+            "Content research (Newsletter): weekly ARC ledger roll-up \u2014 arc-legal + arc-support + arc-compliance",
+            "Content draft (Newsletter): exec summary + 3 deep-dives + cross-agent ledger",
+            "Content polish (Newsletter): Lightning-settlable CTA + inscription-cmd footer",
+            "Content inscribed (Newsletter): 9-agent memref bundle \u2014 full-mesh provenance",
+            "Content meta-attestation: full-mesh publishing witness \u2014 cross-signed by every certified agent",
+        ],
+        "settlements": [
+            ("Content tier: Article + full-mesh anchor \u2014 ARC-inscribed", 9500),
+            ("Content tier: Twitter Thread + inscription bundle \u2014 ARC-inscribed", 6500),
+            ("Content tier: Video Script + B-roll ledger \u2014 ARC-inscribed", 14500),
+            ("Content tier: Newsletter + weekly cross-agent roll-up \u2014 ARC-inscribed", 12500),
         ],
     },
     {

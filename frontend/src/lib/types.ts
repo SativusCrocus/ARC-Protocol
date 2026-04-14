@@ -466,6 +466,56 @@ export interface DataVerifyResult {
   inscription_cmd: string;
 }
 
+// ── Content Creator Agent Types ─────────────────────────────────────────────
+
+export interface ContentFormatSpec {
+  key: string;
+  name: string;
+  summary: string;
+  structure: string[];
+}
+
+export interface ContentFinding {
+  phase: "research" | "draft" | "refine" | "polish";
+  text: string;
+}
+
+export interface ContentCreatorResult {
+  prompt: string;
+  content_format: string;
+  format_name: string;
+  audience: string;
+  price_sats: number;
+  research: string;
+  draft: string;
+  refined: string;
+  polished: string;
+  findings: ContentFinding[];
+  record_ids: string[];
+  dag_memrefs: string[];
+  final_id: string;
+  inscription_cmd: string;
+  chain: RecordWithId[];
+  agent_pubkey: string;
+  dispute_link: string;
+}
+
+export interface ContentCreatorChainResult {
+  chain: RecordWithId[];
+  memref_records: RecordWithId[];
+}
+
+export interface ContentCreatorVerifyResult {
+  id: string;
+  valid: boolean;
+  signature_valid: boolean;
+  errors: string[];
+  memref_count: number;
+  action: string;
+  alias: string;
+  inscription_cmd: string;
+}
+
 // ── Orchestrator / Meta-Agent Types ─────────────────────────────────────────
 
 export interface OrchestratorChildAgent {

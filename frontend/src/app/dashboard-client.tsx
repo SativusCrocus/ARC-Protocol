@@ -32,6 +32,7 @@ import {
   HelpCircle,
   BarChart,
   Network,
+  FileText,
 } from "lucide-react";
 
 const filterTabs = [
@@ -134,6 +135,16 @@ const CERTIFIED_AGENTS = [
     desc: "Meta-agent \u2014 spawns children on demand with mandatory full-DAG memref inheritance",
     aliases: ["arc-orchestrator"],
     keywords: ["orchestrator", "arc-orchestrator", "meta", "spawn"],
+  },
+  {
+    id: "content",
+    name: "Content Creator",
+    href: "/content",
+    icon: FileText,
+    color: "#F43F5E",
+    desc: "Article / Thread / Video Script / Newsletter \u2014 every piece anchored to the full 9-agent DAG",
+    aliases: ["arc-content"],
+    keywords: ["content", "arc-content", "article", "newsletter", "thread"],
   },
 ];
 
