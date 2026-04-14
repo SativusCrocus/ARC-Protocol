@@ -99,7 +99,9 @@ export default function Dashboard() {
         actions: records.filter((r) => r.record.type === "action").length,
         settlements: records.filter((r) => r.record.type === "settlement")
           .length,
-        agents: new Set(records.map((r) => r.record.agent.pubkey)).size,
+        agents: new Set(
+          records.map((r) => r.record.agent.alias || r.record.agent.pubkey)
+        ).size,
         totalSats: records.reduce(
           (sum, r) => sum + (r.record.settlement?.amount_sats || 0),
           0
@@ -147,10 +149,6 @@ export default function Dashboard() {
       )
     : [];
 
-  const agentRanking = [...agentMap]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
-
   const certifiedStats = CERTIFIED_AGENTS.map((agent) => {
     const matchingRecords =
       records?.filter((r) => {
@@ -174,8 +172,37 @@ export default function Dashboard() {
         0
       ),
       active: matchingRecords.length > 0,
+      pubkey:
+        matchingRecords[0]?.record.agent.pubkey || `certified-${agent.id}`,
     };
   });
+
+  // Build Global Index: certified agents pinned first, then other agents.
+  const certifiedPubkeys = new Set(
+    certifiedStats.filter((c) => c.active).map((c) => c.pubkey)
+  );
+  const otherAgents = agentMap
+    .filter((a) => !certifiedPubkeys.has(a.pubkey))
+    .sort((a, b) => b.count - a.count);
+  const agentRanking = [
+    ...certifiedStats.map((c) => ({
+      pubkey: c.pubkey,
+      alias: c.aliases[0],
+      count: c.records,
+      sats: c.sats,
+      memrefs: c.memrefs,
+      actions: [] as string[],
+      certifiedColor: c.color,
+      certifiedName: c.name,
+      certifiedHref: c.href,
+    })),
+    ...otherAgents.map((a) => ({
+      ...a,
+      certifiedColor: undefined as string | undefined,
+      certifiedName: undefined as string | undefined,
+      certifiedHref: undefined as string | undefined,
+    })),
+  ].slice(0, 10);
 
   const qc = useQueryClient();
 
@@ -639,17 +666,22 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               {agentRanking.length > 0 ? (
                 agentRanking.map((agent, i) => {
-                  const agentType = detectAgentType(
-                    agent.alias,
-                    agent.actions
-                  );
-                  const dotColor = agentType?.color || AGENT_PALETTE[i % AGENT_PALETTE.length];
+                  const agentType = agent.certifiedColor
+                    ? {
+                        color: agent.certifiedColor,
+                        name: agent.certifiedName!,
+                        href: agent.certifiedHref!,
+                      }
+                    : detectAgentType(agent.alias, agent.actions);
+                  const dotColor =
+                    agentType?.color ||
+                    AGENT_PALETTE[i % AGENT_PALETTE.length];
+                  const topCount = agentRanking[0]?.count || 1;
                   return (
                     <Link
                       key={agent.pubkey}
                       href={
-                        agentType?.href ||
-                        `/explorer?q=${agent.pubkey}`
+                        agentType?.href || `/explorer?q=${agent.pubkey}`
                       }
                       className="flex items-center gap-3 group"
                     >
@@ -660,7 +692,7 @@ export default function Dashboard() {
                         className="h-2 w-2 rounded-full shrink-0"
                         style={{
                           backgroundColor: dotColor,
-                          boxShadow: `0 0 6px ${dotColor}50`,
+                          boxShadow: `0 0 6px ${dotColor}70`,
                         }}
                       />
                       <div className="flex-1 min-w-0">
@@ -685,7 +717,7 @@ export default function Dashboard() {
                           }}
                           initial={{ width: 0 }}
                           animate={{
-                            width: `${Math.min(100, (agent.count / (agentRanking[0]?.count || 1)) * 100)}%`,
+                            width: `${Math.min(100, (agent.count / topCount) * 100)}%`,
                           }}
                           transition={{
                             duration: 0.8,
@@ -697,9 +729,32 @@ export default function Dashboard() {
                   );
                 })
               ) : (
-                <p className="text-xs text-white/15 text-center py-4">
-                  No agents yet
-                </p>
+                CERTIFIED_AGENTS.map((agent, i) => (
+                  <Link
+                    key={agent.id}
+                    href={agent.href}
+                    className="flex items-center gap-3 group opacity-60"
+                  >
+                    <span className="text-[10px] font-mono text-white/15 w-4">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: agent.color,
+                        boxShadow: `0 0 6px ${agent.color}70`,
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-white/60 group-hover:text-white truncate transition-colors">
+                        {agent.name}
+                      </p>
+                      <p className="text-[10px] text-white/15 font-mono">
+                        awaiting sync
+                      </p>
+                    </div>
+                  </Link>
+                ))
               )}
             </CardContent>
           </Card>
