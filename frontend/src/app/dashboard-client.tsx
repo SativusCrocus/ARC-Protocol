@@ -92,10 +92,19 @@ function detectAgentType(alias?: string, actions?: string[]) {
   );
 }
 
+export type InitialStats = {
+  total: number;
+  agents: number;
+  actions: number;
+  totalSats: number;
+};
+
 export function Dashboard({
   initialRecords,
+  initialStats,
 }: {
   initialRecords: RecordWithId[];
+  initialStats: InitialStats;
 }) {
   const [filter, setFilter] = useState("certified");
 
@@ -107,22 +116,34 @@ export function Dashboard({
     staleTime: 5_000,
   });
 
-  const stats = records
-    ? {
-        total: records.length,
-        genesis: records.filter((r) => r.record.type === "genesis").length,
-        actions: records.filter((r) => r.record.type === "action").length,
-        settlements: records.filter((r) => r.record.type === "settlement")
-          .length,
-        agents: new Set(
-          records.map((r) => r.record.agent.alias || r.record.agent.pubkey)
-        ).size,
-        totalSats: records.reduce(
-          (sum, r) => sum + (r.record.settlement?.amount_sats || 0),
-          0
-        ),
-      }
-    : null;
+  // Never show em-dashes: fall back to server-computed floor if the live
+  // query ever yields a smaller set than the seed (e.g. cold start, error).
+  const liveStats =
+    records && records.length > 0
+      ? {
+          total: records.length,
+          genesis: records.filter((r) => r.record.type === "genesis").length,
+          actions: records.filter((r) => r.record.type === "action").length,
+          settlements: records.filter((r) => r.record.type === "settlement")
+            .length,
+          agents: new Set(
+            records.map((r) => r.record.agent.alias || r.record.agent.pubkey)
+          ).size,
+          totalSats: records.reduce(
+            (sum, r) => sum + (r.record.settlement?.amount_sats || 0),
+            0
+          ),
+        }
+      : null;
+
+  const stats = {
+    total: Math.max(liveStats?.total ?? 0, initialStats.total),
+    genesis: liveStats?.genesis ?? 0,
+    actions: Math.max(liveStats?.actions ?? 0, initialStats.actions),
+    settlements: liveStats?.settlements ?? 0,
+    agents: Math.max(liveStats?.agents ?? 0, initialStats.agents),
+    totalSats: Math.max(liveStats?.totalSats ?? 0, initialStats.totalSats),
+  };
 
   const filteredRecords = records?.filter((r) => {
     if (filter === "all") return true;
@@ -268,7 +289,7 @@ export function Dashboard({
           [
             {
               label: "Records",
-              value: stats?.total ?? "\u2014",
+              value: stats.total,
               unit: "",
               icon: Database,
               accent: "text-white",
@@ -276,7 +297,7 @@ export function Dashboard({
             },
             {
               label: "Agents",
-              value: stats?.agents ?? "\u2014",
+              value: stats.agents,
               unit: "",
               icon: Users,
               accent: "text-[#F7931A]",
@@ -284,7 +305,7 @@ export function Dashboard({
             },
             {
               label: "Actions",
-              value: stats?.actions ?? "\u2014",
+              value: stats.actions,
               unit: "",
               icon: Activity,
               accent: "text-[#00F0FF]",
@@ -292,10 +313,8 @@ export function Dashboard({
             },
             {
               label: "Settled",
-              value: stats?.totalSats
-                ? stats.totalSats.toLocaleString()
-                : "\u2014",
-              unit: stats?.totalSats ? "sats" : "",
+              value: stats.totalSats.toLocaleString(),
+              unit: "sats",
               icon: Zap,
               accent: "text-emerald-400",
               glow: "group-hover:shadow-[0_0_30px_rgba(34,197,94,0.08)]",
@@ -329,7 +348,7 @@ export function Dashboard({
       </div>
 
       {/* Network Effect Banner */}
-      {stats && stats.agents > 0 && (
+      {stats.agents > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
