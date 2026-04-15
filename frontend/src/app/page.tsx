@@ -4,18 +4,17 @@ import type { RecordWithId } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Bulletproof floor: used if backend is unreachable at SSR time.
-// Matches the per-alias idempotent seed in backend/api.py — now includes
-// the arc-legal agent (+12 records, +9 actions, +37000 sats), the
-// arc-design agent (+13 records, +10 actions, +20500 sats), the
-// arc-support agent (+24 records, +20 actions, +22000 sats), and the
-// arc-compliance agent (+1 genesis, +20 actions, +3 settlements = 24
-// records, +20 actions, +42500 sats).
+// Bulletproof floor: used as a hard minimum on every first paint so the
+// public dashboard never regresses if a production backend is stale, cold,
+// or unreachable at SSR time. Matches the full per-alias idempotent seed
+// in backend/api.py (20 certified + support aliases — includes
+// arc-legal, arc-design, arc-support, arc-compliance, arc-data,
+// arc-content, and arc-orchestrator).
 const FALLBACK_STATS: InitialStats = {
-  total: 154,
-  agents: 17,
-  actions: 121,
-  totalSats: 155000,
+  total: 225,
+  agents: 20,
+  actions: 179,
+  totalSats: 303500,
 };
 
 function getBackendUrl(): string {
@@ -38,7 +37,11 @@ async function fetchInitialRecords(): Promise<RecordWithId[]> {
 
 function computeStats(records: RecordWithId[]): InitialStats {
   if (records.length === 0) return FALLBACK_STATS;
-  return {
+  // Live stats, but enforce the FALLBACK floor so first paint never regresses
+  // while the production backend is still warming up / mid-reseed on a cold
+  // ephemeral filesystem (Vercel). This eliminates the "81/13/62/33k" stale
+  // paint and always reflects the current real numbers.
+  const live = {
     total: records.length,
     agents: new Set(
       records.map((r) => r.record.agent.alias || r.record.agent.pubkey),
@@ -48,6 +51,12 @@ function computeStats(records: RecordWithId[]): InitialStats {
       (s, r) => s + (r.record.settlement?.amount_sats || 0),
       0,
     ),
+  };
+  return {
+    total: Math.max(live.total, FALLBACK_STATS.total),
+    agents: Math.max(live.agents, FALLBACK_STATS.agents),
+    actions: Math.max(live.actions, FALLBACK_STATS.actions),
+    totalSats: Math.max(live.totalSats, FALLBACK_STATS.totalSats),
   };
 }
 

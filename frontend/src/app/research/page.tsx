@@ -150,10 +150,29 @@ export default function ResearchPage() {
     enabled: !!result?.final_id,
   });
 
-  const allRecords: RecordWithId[] = [
+  // Fallback: when no active result, pull the live arc-deep-research chain so
+  // the page is never empty — shows the seeded Deep Research records + DAG,
+  // mirroring the Code Generator "Recent Inscriptions" pattern.
+  const seedRecordsQuery = useQuery({
+    queryKey: ["records"],
+    queryFn: api.records,
+    staleTime: 10_000,
+  });
+
+  const seedResearchRecords: RecordWithId[] = (seedRecordsQuery.data || [])
+    .filter(
+      (r) =>
+        (r.record.agent.alias || "").toLowerCase() === "arc-deep-research",
+    )
+    .sort((a, b) => (a.record.ts < b.record.ts ? -1 : 1));
+
+  const activeRecords: RecordWithId[] = [
     ...(chainQuery.data?.chain || result?.chain || []),
     ...(chainQuery.data?.memref_records || []),
   ];
+
+  const allRecords: RecordWithId[] =
+    activeRecords.length > 0 ? activeRecords : seedResearchRecords;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -460,6 +479,77 @@ export default function ResearchPage() {
               records: {result.record_ids.length} | dag_refs:{" "}
               {result.dag_memrefs.length}
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Inscriptions (seeded arc-deep-research chain) — shown before any submission */}
+      {!result && !mutation.isPending && seedResearchRecords.length > 0 && (
+        <div className="space-y-4 anim-fade-up anim-delay-1">
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              {
+                label: "Records",
+                value: seedResearchRecords.length,
+                icon: Layers,
+                color: "#00F0FF",
+              },
+              {
+                label: "Agent",
+                value: "arc-deep-research",
+                icon: Brain,
+                color: "#F7931A",
+                isText: true,
+              },
+              {
+                label: "Status",
+                value: "LIVE",
+                icon: Check,
+                color: "#22c55e",
+                isText: true,
+              },
+            ].map(({ label, value, icon: Icon, color, isText }) => (
+              <Card key={label} className="border-white/[0.04] bg-[#0a0a0a]">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon className="h-3 w-3" style={{ color: `${color}80` }} />
+                    <span className="text-[9px] text-white/25 uppercase tracking-wider">
+                      {label}
+                    </span>
+                  </div>
+                  <p
+                    className={`${isText ? "text-sm" : "text-xl"} font-bold`}
+                    style={{ color }}
+                  >
+                    {value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <GitBranch className="h-3.5 w-3.5 text-[#00F0FF]/50" />
+              <h3 className="text-xs font-medium text-white/30 uppercase tracking-wider">
+                Recent Research Inscriptions
+              </h3>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-[#00F0FF]/60 border-[#00F0FF]/20 px-1.5"
+              >
+                live seed chain
+              </Badge>
+            </div>
+            <div className="h-[400px] border border-[#00F0FF]/10 rounded-xl overflow-hidden bg-[#020202]">
+              <Suspense
+                fallback={
+                  <div className="h-full skeleton-shimmer rounded-xl" />
+                }
+              >
+                <DAGViewer records={seedResearchRecords} />
+              </Suspense>
+            </div>
           </div>
         </div>
       )}
