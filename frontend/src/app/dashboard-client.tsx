@@ -33,6 +33,10 @@ import {
   BarChart,
   Network,
   FileText,
+  BadgeCheck,
+  Droplet,
+  Target,
+  Gavel,
 } from "lucide-react";
 
 const filterTabs = [
@@ -446,6 +450,62 @@ export function Dashboard({
           </Card>
         ))}
       </div>
+
+      {/* Get ARC Certified Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-[#F7931A]/20 bg-gradient-to-br from-[#F7931A]/[0.08] via-black/40 to-[#00F0FF]/[0.06] p-6 anim-fade-up anim-delay-1"
+      >
+        <div className="absolute inset-0 opacity-40 pointer-events-none">
+          <div className="absolute -top-16 -left-16 h-48 w-48 rounded-full bg-[#F7931A]/20 blur-3xl" />
+          <div className="absolute -bottom-16 -right-16 h-48 w-48 rounded-full bg-[#00F0FF]/15 blur-3xl" />
+        </div>
+        <div className="relative flex flex-col lg:flex-row lg:items-center gap-6">
+          <div className="flex items-start gap-4 flex-1">
+            <div className="p-3 rounded-xl bg-[#F7931A]/10 border border-[#F7931A]/20 shrink-0">
+              <BadgeCheck className="h-6 w-6 text-[#F7931A]" />
+            </div>
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base lg:text-lg font-semibold text-white/90">
+                  Get ARC Certified
+                </h3>
+                <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#F7931A]/15 text-[#F7931A] border border-[#F7931A]/20">
+                  Schnorr-signed · On-chain
+                </span>
+              </div>
+              <p className="text-xs text-white/40 leading-relaxed max-w-2xl">
+                Claim a verifiable BIP-340 credential, earn Lightning royalties when children settle,
+                bid sats on top memory nodes, claim real bounties, and drop a 2,000-sat reward for
+                referencing any 3 ARC IDs. Every ARC action becomes an inscription on Bitcoin.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:w-auto w-full">
+            <Link href="/badge">
+              <Button size="sm" className="w-full gap-1.5 bg-[#F7931A] text-black hover:bg-[#F7931A]/90">
+                <BadgeCheck className="h-3.5 w-3.5" /> Certify
+              </Button>
+            </Link>
+            <Link href="/bounties">
+              <Button size="sm" variant="outline" className="w-full gap-1.5">
+                <Target className="h-3.5 w-3.5" /> Bounties
+              </Button>
+            </Link>
+            <Link href="/market">
+              <Button size="sm" variant="outline" className="w-full gap-1.5">
+                <Gavel className="h-3.5 w-3.5" /> Market
+              </Button>
+            </Link>
+            <Link href="/faucet">
+              <Button size="sm" variant="outline" className="w-full gap-1.5">
+                <Droplet className="h-3.5 w-3.5" /> Faucet
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Network Effect Banner */}
       {stats.agents > 0 && (

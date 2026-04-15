@@ -25,6 +25,10 @@ import {
   BarChart,
   Network,
   FileText,
+  Droplet,
+  Gavel,
+  Target,
+  BadgeCheck,
 } from "lucide-react";
 
 const links = [
@@ -40,6 +44,10 @@ const links = [
   { href: "/orchestrator", label: "Orchestrator", icon: Network },
   { href: "/content", label: "Content Creator", icon: FileText },
   { href: "/marketplace", label: "Marketplace", icon: Store },
+  { href: "/bounties", label: "Bounty Board", icon: Target },
+  { href: "/market", label: "Memory Market", icon: Gavel },
+  { href: "/badge", label: "ARC Certified", icon: BadgeCheck },
+  { href: "/faucet", label: "Faucet", icon: Droplet },
   { href: "/create", label: "New Record", icon: PlusCircle },
   { href: "/explorer", label: "Memory DAG", icon: GitBranch },
   { href: "/dag", label: "Agent DAG", icon: Orbit },
