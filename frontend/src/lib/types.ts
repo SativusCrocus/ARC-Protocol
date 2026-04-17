@@ -10,9 +10,16 @@ export interface Settlement {
   preimage?: string;
 }
 
+export type MemoryType =
+  | "fact"
+  | "decision"
+  | "preference"
+  | "context"
+  | "learning";
+
 export interface ARCRecord {
   arc: string;
-  type: "genesis" | "action" | "settlement";
+  type: "genesis" | "action" | "settlement" | "memory";
   agent: Agent;
   prev: string | null;
   memrefs: string[];
@@ -22,6 +29,45 @@ export interface ARCRecord {
   action: string;
   settlement?: Settlement;
   sig: string;
+  // Memory-only fields (present when type === "memory")
+  memory_type?: MemoryType;
+  memory_key?: string;
+  memory_value?: string;
+  ttl?: number | null;
+  supersedes?: string | null;
+}
+
+export interface MemoryRecord extends RecordWithId {
+  record: ARCRecord & {
+    type: "memory";
+    memory_type: MemoryType;
+    memory_key: string;
+    memory_value: string;
+  };
+}
+
+export interface MemorySearchResult {
+  results: MemoryRecord[];
+}
+
+export interface MemoryLatestResult {
+  id: string;
+  record: ARCRecord;
+  timeline: MemoryRecord[];
+}
+
+export interface MemoryTimelineResult {
+  key: string;
+  history: MemoryRecord[];
+}
+
+export interface MemoryStats {
+  total: number;
+  by_type: Record<string, number>;
+  by_agent_count: number;
+  top_keys: { key: string; count: number }[];
+  tombstoned: number;
+  expired: number;
 }
 
 export interface RecordWithId {

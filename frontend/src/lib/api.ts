@@ -52,6 +52,12 @@ import type {
   LiveSpawnResult,
   ScheduleStatus,
   ScheduleTickResult,
+  MemoryType,
+  MemoryRecord,
+  MemorySearchResult,
+  MemoryLatestResult,
+  MemoryTimelineResult,
+  MemoryStats,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api/arc";
@@ -393,4 +399,259 @@ export const api = {
       `/orchestrator/schedule/tick?force=${force ? "true" : "false"}`,
       { method: "POST", body: JSON.stringify({}) },
     ),
+
+  // ── Memory Layer ───────────────────────────────────────────────────
+  memoryStore: (data: {
+    memory_key: string;
+    memory_value: string;
+    memory_type?: MemoryType;
+    ttl?: number | null;
+    supersedes?: string | null;
+    alias?: string;
+  }) =>
+    request<{ id: string; record: MemoryRecord["record"] }>("/memory", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  memorySearch: (q: string = "", agent?: string, limit = 100) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (agent) params.set("agent", agent);
+    params.set("limit", String(limit));
+    return request<MemorySearchResult>(`/memory/search?${params.toString()}`);
+  },
+
+  memoryLatest: (key: string) =>
+    request<MemoryLatestResult>(`/memory/latest/${encodeURIComponent(key)}`),
+
+  memoryTimeline: (key: string) =>
+    request<MemoryTimelineResult>(`/memory/timeline/${encodeURIComponent(key)}`),
+
+  memoryAgent: (pubkey: string) =>
+    request<{ agent: string; results: MemoryRecord[] }>(
+      `/memory/agent/${pubkey}`,
+    ),
+
+  memoryStats: () => request<MemoryStats>("/memory/stats"),
+
+  memoryDelete: (id: string) =>
+    request<{ id: string; record: MemoryRecord["record"]; tombstoned: string }>(
+      `/memory/${id}`,
+      { method: "DELETE" },
+    ),
+};
+
+// ── Goose-powered orchestrator runtime (separate service) ───────────
+// Talks to /orchestrator service (default :8100). Every dispatch here
+// spawns a real (or dry-run) Goose session; records appear on the ARC
+// backend via the MCP server, not synthesised by a cron.
+
+export const GOOSE_ORCH_BASE =
+  process.env.NEXT_PUBLIC_GOOSE_ORCH_URL || "http://localhost:8100";
+
+export type GooseAgent = {
+  agent_name: string;
+  display_name: string;
+  role: string;
+  color: string;
+  trigger: "on_demand" | "scheduled" | "webhook";
+  schedule: string | null;
+  webhook_path: string | null;
+  provider: string;
+  mcp_servers: string[];
+  tools: string[];
+  is_meta: boolean;
+  child_agents: string[];
+  pubkey: string | null;
+};
+
+export type GooseDispatchResult = {
+  agent: string;
+  task: string;
+  ok: boolean;
+  started_at: number;
+  finished_at: number;
+  dry_run: boolean;
+  goose: Record<string, unknown>;
+  extracted_record_ids: string[];
+  new_head: string | null;
+  error: string | null;
+};
+
+export type GooseActivityEvent = {
+  kind: string;
+  ts: number;
+  agent: string | null;
+  payload: Record<string, unknown>;
+};
+
+async function gooseRequest<T>(path: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(`${GOOSE_ORCH_BASE}${path}`, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...opts?.headers },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `${res.status} ${res.statusText}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const gooseApi = {
+  health: () =>
+    gooseRequest<{
+      ok: boolean;
+      agents: number;
+      goose_available: boolean;
+      dry_run: boolean;
+      arc_api_url: string;
+    }>("/health"),
+
+  agents: () => gooseRequest<GooseAgent[]>("/orchestrator/agents"),
+
+  dispatch: (task: string, agent?: string) =>
+    gooseRequest<GooseDispatchResult>("/orchestrator/dispatch", {
+      method: "POST",
+      body: JSON.stringify(agent ? { task, agent } : { task }),
+    }),
+
+  trigger: (agentName: string, task: string) =>
+    gooseRequest<GooseDispatchResult>(
+      `/orchestrator/agent/${encodeURIComponent(agentName)}/trigger`,
+      { method: "POST", body: JSON.stringify({ task }) },
+    ),
+
+  activity: (limit = 50) =>
+    gooseRequest<GooseActivityEvent[]>(
+      `/orchestrator/activity?limit=${limit}`,
+    ),
+
+  streamURL: () =>
+    GOOSE_ORCH_BASE.replace(/^http/, "ws") + "/orchestrator/stream",
+
+  // ── Recipes ───────────────────────────────────────────────────────
+  recipes: () => gooseRequest<RecipeSummary[]>("/recipes"),
+
+  recipe: (name: string) =>
+    gooseRequest<RecipeSummary>(`/recipe/${encodeURIComponent(name)}`),
+
+  runRecipe: (recipe: string, params: Record<string, unknown>) =>
+    gooseRequest<{ run_id: string; status: string; recipe: string }>(
+      "/recipe/run",
+      { method: "POST", body: JSON.stringify({ recipe, params }) },
+    ),
+
+  recipeRun: (id: string) =>
+    gooseRequest<RecipeRunStatus>(`/recipe/run/${id}`),
+
+  recipeReport: (id: string) =>
+    gooseRequest<RecipeReport>(`/recipe/run/${id}/report`),
+
+  recipeRuns: (limit = 25) =>
+    gooseRequest<RecipeRunStatus[]>(`/recipe/runs?limit=${limit}`),
+};
+
+export type RecipeParameter = {
+  name: string;
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+};
+
+export type RecipeSummary = {
+  name: string;
+  description: string;
+  parameters: RecipeParameter[];
+  arc: {
+    enabled: boolean;
+    agent: string | null;
+    settle_on_complete: boolean;
+    settlement_amount_sats: number;
+    memref_strategy: "full_chain" | "previous_only" | "none";
+    inscription: boolean;
+  };
+  steps: { name: string; action_label: string; memrefs: string[] }[];
+};
+
+export type RecipeStepExecution = {
+  name: string;
+  action_label: string;
+  prompt: string;
+  ihash: string;
+  ohash: string | null;
+  output: string;
+  record_id: string | null;
+  prev: string | null;
+  memrefs: string[];
+  started_at: number;
+  finished_at: number;
+  status: "pending" | "running" | "ok" | "skipped" | "failed";
+  error: string | null;
+  cached: boolean;
+};
+
+export type RecipeRunStatus = {
+  id: string;
+  recipe: string;
+  agent: string | null;
+  params: Record<string, unknown>;
+  status: "pending" | "running" | "completed" | "failed";
+  steps: RecipeStepExecution[];
+  chain_head_before: string | null;
+  chain_head_after: string | null;
+  settlement_id: string | null;
+  settlement_sats: number | null;
+  settlement_preimage: string | null;
+  inscription_cmd: string | null;
+  started_at: number;
+  finished_at: number | null;
+  error: string | null;
+  dry_run: boolean;
+};
+
+export type RecipeReportStep = {
+  index: number;
+  name: string;
+  action_label: string;
+  status: string;
+  cached: boolean;
+  record_id: string | null;
+  prev: string | null;
+  ihash: string;
+  ohash: string | null;
+  memref_count: number;
+  memrefs: string[];
+  duration_seconds: number | null;
+  error: string | null;
+  explorer_url: string | null;
+};
+
+export type RecipeReport = {
+  run_id: string;
+  recipe: string;
+  agent: string | null;
+  params: Record<string, unknown>;
+  status: string;
+  dry_run: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_seconds: number | null;
+  chain_head_before: string | null;
+  chain_head_after: string | null;
+  steps: RecipeReportStep[];
+  settlement: {
+    settled: boolean;
+    record_id: string | null;
+    amount_sats: number | null;
+    preimage: string | null;
+  };
+  inscription_cmd: string | null;
+  validation: { verified: boolean; failed_steps: string[] };
+  explorer_url: string | null;
+  error: string | null;
+  recipe_description?: string;
+  memref_strategy?: string;
+  dag_ascii: string;
+  summary_text: string;
 };

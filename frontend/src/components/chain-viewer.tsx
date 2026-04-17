@@ -17,12 +17,14 @@ const TYPE_COLORS: Record<string, string> = {
   genesis: "#F7931A",
   action: "#00F0FF",
   settlement: "#22c55e",
+  memory: "#A855F7",
 };
 
 const TYPE_GLOW: Record<string, string> = {
   genesis: "0 0 24px rgba(247,147,26,0.35), inset 0 0 16px rgba(247,147,26,0.1)",
   action: "0 0 24px rgba(0,240,255,0.25), inset 0 0 16px rgba(0,240,255,0.08)",
   settlement: "0 0 24px rgba(34,197,94,0.25), inset 0 0 16px rgba(34,197,94,0.08)",
+  memory: "0 0 24px rgba(168,85,247,0.30), inset 0 0 16px rgba(168,85,247,0.10)",
 };
 
 export function ChainViewer({ records }: { records: RecordWithId[] }) {
@@ -49,7 +51,15 @@ export function ChainViewer({ records }: { records: RecordWithId[] }) {
               {r.record.type}
             </div>
             <div className="text-[11px] text-white/70 truncate max-w-[180px] leading-snug">
-              {r.record.action}
+              {r.record.type === "memory" && r.record.memory_key ? (
+                <>
+                  <span style={{ color: "#A855F7" }}>{r.record.memory_key}</span>
+                  <span className="text-white/30"> = </span>
+                  <span>{r.record.memory_value}</span>
+                </>
+              ) : (
+                r.record.action
+              )}
             </div>
             <div className="text-[9px] text-white/25 font-mono mt-2">
               {r.id.slice(0, 16)}&hellip;

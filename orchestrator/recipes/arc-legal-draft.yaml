@@ -1,0 +1,56 @@
+name: arc-legal-draft
+description: |
+  Draft a legal document from a template, compliance-check it, and finalise
+  with a Lightning-settled attestation. Every phase is signed on the ARC DAG.
+
+parameters:
+  - name: template
+    description: Template key (nda, msa, saas_tos, sow, …)
+    required: true
+  - name: parties
+    description: Comma-separated party names
+    required: true
+  - name: jurisdiction
+    description: Governing-law jurisdiction
+    required: false
+    default: Delaware, USA
+
+arc:
+  enabled: true
+  agent: arc-legal
+  settle_on_complete: true
+  settlement_amount_sats: 2500
+  memref_strategy: full_chain
+  inscription: true
+
+steps:
+  - name: template_load
+    prompt: |
+      Load the {template} template boilerplate. Extract the list of clauses
+      to assemble for parties: {parties}. Jurisdiction: {jurisdiction}.
+    arc:
+      action_label: "Template load: {template}"
+
+  - name: draft
+    prompt: |
+      Draft the document using the loaded clauses. Fill every placeholder.
+      Do not invent clauses; flag any gap explicitly.
+    arc:
+      action_label: "Draft for {parties}"
+      memrefs: [template_load]
+
+  - name: compliance_check
+    prompt: |
+      Compliance-check the draft against {jurisdiction} norms and the
+      template's required clauses. Flag missing / non-compliant items.
+    arc:
+      action_label: "Compliance check ({jurisdiction})"
+      memrefs: [template_load, draft]
+
+  - name: finalise
+    prompt: |
+      Apply compliance feedback, finalise the document, and produce a
+      ready-to-sign version. Attach an executive summary.
+    arc:
+      action_label: "Finalise document"
+      memrefs: [draft, compliance_check]

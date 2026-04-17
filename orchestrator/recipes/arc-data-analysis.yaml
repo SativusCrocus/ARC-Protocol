@@ -1,0 +1,65 @@
+name: arc-data-analysis
+description: |
+  End-to-end data analysis pipeline — ingest, clean, analyse, visualise,
+  report. Each phase is signed on the ARC DAG with cross-phase memrefs.
+
+parameters:
+  - name: dataset
+    description: Dataset identifier or URL
+    required: true
+  - name: question
+    description: Analytical question to answer
+    required: true
+  - name: analysis_type
+    description: "descriptive | diagnostic | predictive | prescriptive"
+    required: false
+    default: descriptive
+
+arc:
+  enabled: true
+  agent: arc-data
+  settle_on_complete: true
+  settlement_amount_sats: 1200
+  memref_strategy: full_chain
+  inscription: false
+
+steps:
+  - name: ingest
+    prompt: |
+      Ingest {dataset}. Report row/column count, schema, and any obvious
+      quality issues. Do not mutate the source.
+    arc:
+      action_label: "Ingest {dataset}"
+
+  - name: clean
+    prompt: |
+      Clean the ingested dataset: handle missing values, type-coerce,
+      deduplicate, reconcile units. Emit a clean-data summary.
+    arc:
+      action_label: "Clean data"
+      memrefs: [ingest]
+
+  - name: analyse
+    prompt: |
+      Run a {analysis_type} analysis on the cleaned data to answer:
+      {question}. Show methodology inline.
+    arc:
+      action_label: "Analyse ({analysis_type})"
+      memrefs: [ingest, clean]
+
+  - name: visualise
+    prompt: |
+      Propose 2–4 visualisations that best expose the answer. Describe
+      axes, encodings, and expected takeaways for each.
+    arc:
+      action_label: "Visualise"
+      memrefs: [analyse]
+
+  - name: report
+    prompt: |
+      Produce the final report: Question / Method / Findings /
+      Visualisations / Caveats / Next actions. Cite each claim back to
+      the dataset.
+    arc:
+      action_label: "Report"
+      memrefs: [ingest, clean, analyse, visualise]

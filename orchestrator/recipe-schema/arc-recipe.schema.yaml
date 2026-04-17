@@ -1,0 +1,149 @@
+# ARC-aware Goose Recipe — JSON Schema (YAML)
+#
+# Describes the top-level `arc:` block that an ARC-aware Goose recipe may
+# declare, plus the per-step `arc:` block. Vanilla Goose recipe fields
+# (name, description, parameters, steps[].name, steps[].prompt) are passed
+# through verbatim; this file only documents the ARC extension.
+#
+# A recipe is validated against this schema by
+# `arc_orchestrator.recipe_middleware.validate_recipe` before execution.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://arc-protocol.dev/schema/arc-recipe.schema.json"
+title: ARC-aware Goose Recipe
+type: object
+required: [name, steps]
+
+properties:
+  name:
+    type: string
+    minLength: 1
+    description: "Unique slug for the recipe (used by /recipe/run)."
+  description:
+    type: string
+  parameters:
+    type: array
+    description: "Declared parameters that `{placeholders}` in prompts refer to."
+    items:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        description: { type: string }
+        required: { type: boolean, default: true }
+        default: {}
+
+  arc:
+    type: object
+    description: "Top-level ARC integration config for this recipe."
+    properties:
+      enabled:
+        type: boolean
+        default: true
+        description: "Master switch. When false, steps run without ARC provenance."
+      agent:
+        type: string
+        description: "ARC agent identity used to author records (alias)."
+      settle_on_complete:
+        type: boolean
+        default: false
+        description: "Create a Lightning settlement record when the last step completes."
+      settlement_amount_sats:
+        type: integer
+        minimum: 1
+        maximum: 2100000000000000
+        description: "Satoshis to settle if settle_on_complete is true."
+      memref_strategy:
+        type: string
+        enum: [full_chain, previous_only, none]
+        default: full_chain
+        description: |
+          Cross-step memref policy:
+            full_chain    — each step references every prior step's record.
+            previous_only — each step references only the immediately prior step.
+            none          — no memrefs; only the `prev` hash-chain.
+      inscription:
+        type: boolean
+        default: false
+        description: "If true, the final record's inscription envelope is included in the report. Actual broadcasting is out of band."
+    additionalProperties: false
+
+  steps:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [name, prompt]
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z][a-z0-9_-]*$"
+          description: "Step identifier — referenced from arc.memrefs."
+        prompt:
+          type: string
+          minLength: 1
+          description: "Goose prompt; may contain {param} placeholders."
+        arc:
+          type: object
+          description: "Per-step ARC config."
+          properties:
+            action_label:
+              type: string
+              description: "Human-readable label embedded in the ARC record's action field."
+            capture_output_hash:
+              type: boolean
+              default: true
+              description: "If true, the step output is hashed into ohash. Defaults on."
+            memrefs:
+              type: array
+              items:
+                type: string
+                pattern: "^[a-z][a-z0-9_-]*$"
+              description: "Names of prior steps whose records this step references. Overrides memref_strategy for this step."
+            settle:
+              type: object
+              description: "Per-step settlement override."
+              properties:
+                amount_sats:
+                  type: integer
+                  minimum: 1
+          additionalProperties: false
+      additionalProperties: true
+
+examples:
+  - name: research-and-report
+    description: Research a topic and produce a report.
+    parameters:
+      - name: topic
+        description: "Research subject"
+        required: true
+    arc:
+      enabled: true
+      agent: arc-deep-research
+      settle_on_complete: true
+      settlement_amount_sats: 500
+      memref_strategy: full_chain
+      inscription: false
+    steps:
+      - name: research
+        prompt: "Research {topic} using web search."
+        arc:
+          action_label: "Research phase: {topic}"
+          capture_output_hash: true
+      - name: analyze
+        prompt: "Analyze the research findings."
+        arc:
+          action_label: "Analysis phase"
+          memrefs: [research]
+      - name: draft
+        prompt: "Draft a report based on the analysis."
+        arc:
+          action_label: "Drafting phase"
+          memrefs: [research, analyze]
+      - name: review
+        prompt: "Review the draft for accuracy and completeness."
+        arc:
+          action_label: "Review phase"
+          memrefs: [draft]

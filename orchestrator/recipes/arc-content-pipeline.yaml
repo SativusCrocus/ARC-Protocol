@@ -1,0 +1,66 @@
+name: arc-content-pipeline
+description: |
+  End-to-end content pipeline — ideate, research, draft, edit, publish.
+  Provenance for every phase, royalty-friendly Lightning settlement on
+  publish.
+
+parameters:
+  - name: topic
+    description: Content topic
+    required: true
+  - name: audience
+    description: Target audience
+    required: false
+    default: technical founders
+  - name: format
+    description: "article | newsletter | thread | video_script"
+    required: false
+    default: article
+
+arc:
+  enabled: true
+  agent: arc-content
+  settle_on_complete: true
+  settlement_amount_sats: 1000
+  memref_strategy: full_chain
+  inscription: true
+
+steps:
+  - name: ideate
+    prompt: |
+      Brainstorm 3 angles on {topic} for {audience}. Pick the sharpest.
+      Output: chosen angle + rejected alternatives + why.
+    arc:
+      action_label: "Ideation: {topic}"
+
+  - name: research
+    prompt: |
+      Research the chosen angle. Cite primary sources. Note any claim
+      that needs verification before publish.
+    arc:
+      action_label: "Research"
+      memrefs: [ideate]
+
+  - name: draft
+    prompt: |
+      Draft the {format} at 70% final length. Lead with the payoff; no
+      throat-clearing.
+    arc:
+      action_label: "Draft ({format})"
+      memrefs: [ideate, research]
+
+  - name: edit
+    prompt: |
+      Edit for clarity, flow, and fact-accuracy. Cut 15%. Flag any claim
+      still lacking a source.
+    arc:
+      action_label: "Edit"
+      memrefs: [draft, research]
+
+  - name: publish
+    prompt: |
+      Produce the publish-ready artifact and a 1-sentence summary suitable
+      for the marketplace listing.
+    arc:
+      action_label: "Publish"
+      memrefs: [edit]

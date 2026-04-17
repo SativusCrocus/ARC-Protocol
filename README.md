@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/Bitcoin-BIP--340_Schnorr-F7931A?style=flat-square&logo=bitcoin&logoColor=white" alt="BIP-340"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"/>
   <img src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 15"/>
+  <a href="distro/arc-goose"><img src="https://img.shields.io/badge/ARC_Goose-Distribution-8B5CF6?style=flat-square" alt="ARC Goose Distribution"/></a>
 </p>
 
 ---
@@ -62,6 +63,66 @@ unobsoletable – like TCP/IP, the value accrues to the network, not the impleme
 - **Storage**: SQLite (local dev) → Bitcoin inscriptions (production)
 - **LLM**: Ollama (local, free) for prompt→hash generation
 - **Settlement**: Lightning Network via LND REST API
+- **MCP Server**: `mcp-server/` exposes ARC as [Model Context Protocol](https://modelcontextprotocol.io) tools so [Goose](https://github.com/aaif-goose/goose) and other MCP-compatible agents can call `arc_keygen`, `arc_genesis`, `arc_action`, `arc_validate`, `arc_settle`, `arc_chain`, and `arc_list_records` natively over stdio or SSE
+- **Orchestrator**: `orchestrator/` is the new Goose-powered runtime. Each of the 10 ARC agents is defined by a YAML spec (system prompt + provider + MCP config + trigger) and runs as a short-lived Goose session wired into the ARC MCP server — so every action becomes a genuine signed ARC record instead of a cron-generated placeholder. The original cron orchestrator is preserved as a fallback under `orchestrator/legacy/`.
+
+### MCP Server
+
+The [`mcp-server/`](mcp-server/) subproject is a standalone Python package that
+wraps the ARC REST API as MCP tools. An AI agent running inside Goose can
+establish a Bitcoin identity for itself, write signed provenance records, and
+settle payments — all through tool calls, without touching ARC's internals.
+
+Quick start:
+
+```bash
+cd mcp-server
+pip install -e .
+ARC_API_URL=http://localhost:8000 arc-mcp        # stdio (for Goose CLI)
+ARC_API_URL=http://localhost:8000 arc-mcp-sse    # SSE  (for remote clients)
+```
+
+See [mcp-server/README.md](mcp-server/README.md) for the Goose
+`~/.config/goose/config.yaml` snippet and remote-deployment notes.
+
+### Orchestrator
+
+The [`orchestrator/`](orchestrator/) subproject replaces the old cron-based
+"spawn every 6 hours" runtime with a real Goose-powered dispatcher. Each of
+the 10 ARC agents is defined by a YAML file under
+[`orchestrator/agents/`](orchestrator/agents/) that specifies its role,
+system prompt, LLM provider, MCP servers, and trigger mode
+(`on_demand` / `scheduled` / `webhook`). When a task arrives, the runtime
+spawns a short-lived Goose session wired into the [ARC MCP
+server](mcp-server/) — whatever arc_* tool calls that session makes become
+real, signed ARC records.
+
+The orchestrator exposes a FastAPI surface and a WebSocket activity stream:
+
+```
+POST /orchestrator/dispatch              # route or target a task
+GET  /orchestrator/agents                # list agents + triggers + pubkeys
+GET  /orchestrator/agent/{name}/history  # per-agent recent activity
+POST /orchestrator/agent/{name}/trigger  # manually fire one agent
+WS   /orchestrator/stream                # real-time event stream
+```
+
+Quick start:
+
+```bash
+cd orchestrator
+pip install -e .
+ARC_ORCH_DRY_RUN=true arc-orchestrator   # works without Goose installed
+# once Goose is installed:
+unset ARC_ORCH_DRY_RUN && arc-orchestrator
+```
+
+Dry-run mode is automatic when the Goose CLI isn't on PATH, so the runtime,
+scheduler, API, and WebSocket stream all work in development and CI without
+a real LLM. See [orchestrator/README.md](orchestrator/README.md) for full
+configuration and the agent YAML schema. The cron-based orchestrator it
+replaces is preserved as a fallback in
+[orchestrator/legacy/](orchestrator/legacy/).
 
 ## Quick Start (60 seconds)
 
@@ -195,8 +256,145 @@ arc view-chain PUBKEY_OR_ID                  # View full provenance chain
 | `GET` | `/chain/{id}` | Get full chain (by record ID or pubkey) |
 | `GET` | `/records` | List all records |
 | `GET` | `/inscription/{id}` | Get `ord` inscription command |
+| `POST` | `/memory` | Store a signed memory record |
+| `GET` | `/memory/search?q=<prefix>` | Search memories by key pattern |
+| `GET` | `/memory/agent/{pubkey}` | All memories for an agent |
+| `GET` | `/memory/latest/{key}` | Current value for a memory key |
+| `GET` | `/memory/timeline/{key}` | Full history for a memory key |
+| `GET` | `/memory/stats` | Memory layer statistics |
+| `DELETE` | `/memory/{id}` | Soft-delete (append tombstone) |
 
 Interactive API docs at [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI).
+
+## Memory Layer — verifiable cross-session memory for Goose
+
+ARC now ships a first-class **memory** record type that turns the DAG into
+persistent, cryptographically verifiable memory for Goose (or any MCP-speaking)
+agents. Every memory is Schnorr-signed and hash-chained — tamper any byte and
+verification fails.
+
+Out of the box, Goose has `.goosehints` and session history: editable, unsigned,
+local. ARC memory replaces that with an append-only, signed, auditable store
+any party can verify.
+
+### Record shape
+
+A memory record has every standard ARC field plus:
+
+```jsonc
+{
+  "type": "memory",
+  "memory_type": "fact" | "decision" | "preference" | "context" | "learning",
+  "memory_key":   "user.preferred_language",    // [a-z0-9._-]+, dotted namespaces
+  "memory_value": "python",                      // up to 4 KB
+  "ttl": 86400,                                  // optional seconds, omit = permanent
+  "supersedes": "<prior_record_id>"             // optional — same agent, replaces prior
+  // ... standard fields: arc, agent, prev, memrefs, ts, ihash, ohash, action, sig
+}
+```
+
+### Namespace convention
+
+| Prefix     | Contents                                               |
+| ---------- | ------------------------------------------------------ |
+| `user.*`   | User preferences and profile info                      |
+| `project.*`| Project-level decisions and context                    |
+| `session.*`| Session summaries and key outcomes                     |
+| `agent.*`  | Agent-specific learned behaviors                       |
+| `task.*`   | Task-related context and findings                      |
+
+### MCP tools
+
+The `arc-mcp` server exposes three memory tools to any Goose agent:
+
+- **`arc_memory_store`** — persist a new memory (signed + chained).
+- **`arc_memory_recall`** — search past memories by key pattern.
+- **`arc_memory_latest`** — current value for a key, walking the supersedes chain.
+
+The MCP server keeps a TTL cache in front of SQLite so recall is cheap; writes
+invalidate the cache so new memories are immediately visible. Supersedes chains
+are bounded at 100 links.
+
+### Goose skill
+
+See [`mcp-server/goose-memory-skill/SKILL.md`](mcp-server/goose-memory-skill/SKILL.md)
+for the instruction file that teaches Goose when to store memories, when to
+skip them, and how to update them with `supersedes`.
+
+**Do not store secrets, credentials, API keys, or PII as memories** — memories
+are public, signed, and append-only. Once written, you can tombstone but never
+redact; the original remains auditable on the DAG (and, if inscribed, on Bitcoin).
+
+### Frontend
+
+The `/memory` route is a dedicated memory browser with:
+
+- Key-pattern search
+- Timeline view per key (including the full supersedes chain)
+- Agent-grouped view
+- Memory stats (totals, top keys, by-type breakdown)
+
+Memory records are also visually distinguished (purple) in the Memory DAG
+explorer and appear as first-class biddable nodes in the Memory Market.
+
+## Recipes — provenance-wrapped Goose workflows
+
+Goose supports YAML-defined agentic workflows ("recipes"). ARC ships a
+middleware layer that wraps every recipe step in a Schnorr-signed ARC
+record. When a recipe runs, each step becomes a node in an append-only
+provenance DAG; on completion the entire workflow is auditable, and the
+final head can be Lightning-settled or Bitcoin-inscribed.
+
+See [`orchestrator/README.md`](orchestrator/README.md) for the full recipe
+docs. The shipped recipes under [`orchestrator/recipes/`](orchestrator/recipes/):
+
+| Recipe                 | Steps                                                |
+| ---------------------- | ---------------------------------------------------- |
+| `arc-deep-research`    | scope → research → analyse → synthesise              |
+| `arc-code-review`      | scan → analyse → report                              |
+| `arc-legal-draft`      | template_load → draft → compliance_check → finalise  |
+| `arc-data-analysis`    | ingest → clean → analyse → visualise → report        |
+| `arc-content-pipeline` | ideate → research → draft → edit → publish           |
+
+Every recipe declares an `arc:` block configuring the agent identity,
+memref strategy (`full_chain` / `previous_only` / `none`), Lightning
+settlement on completion, and optional Bitcoin inscription. Step execution
+is async and idempotent — the `ihash` of `(step_name, resolved prompt,
+params)` is the deduplication key across retries. Browse, parameterise,
+and launch recipes from the `/recipes` page in the frontend.
+
+Recipe REST endpoints (on the orchestrator service, default port 8100):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/recipes` | List available recipes |
+| `GET`  | `/recipe/{name}` | Recipe summary |
+| `POST` | `/recipe/run` | Kick off an async run |
+| `GET`  | `/recipe/run/{id}` | Poll run status |
+| `GET`  | `/recipe/run/{id}/report` | Provenance report (DAG ascii + settlement) |
+
+## Distributions — ARC Goose
+
+**ARC Goose** is a custom [Goose](https://github.com/aaif-goose/goose) distribution
+where every agent action automatically produces a Bitcoin-anchored provenance record.
+It's vanilla Goose + the ARC MCP server + a first-run keygen/genesis flow, packaged
+as a one-command install.
+
+```bash
+cd distro/arc-goose
+./install.sh            # idempotent: generates keypair + genesis record once
+docker compose up -d    # full stack on localhost:3000 / :8000
+goose session           # every significant turn is Schnorr-signed and chained
+```
+
+Docs live in [`distro/arc-goose/docs`](distro/arc-goose/docs):
+
+- [QUICKSTART.md](distro/arc-goose/docs/QUICKSTART.md) — 3-step setup
+- [ARCHITECTURE.md](distro/arc-goose/docs/ARCHITECTURE.md) — data flow, what gets recorded, security model
+- [UPGRADING.md](distro/arc-goose/docs/UPGRADING.md) — upstream Goose sync policy + compatibility matrix
+
+**Licensing:** ARC Goose is MIT (matching ARC Protocol). Upstream Goose is Apache-2.0.
+Both are compatible; see [CONTRIBUTING-DISTRO.md](CONTRIBUTING-DISTRO.md) for details.
 
 ## Running Tests
 

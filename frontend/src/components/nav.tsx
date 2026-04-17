@@ -29,6 +29,8 @@ import {
   Gavel,
   Target,
   BadgeCheck,
+  Database,
+  BookOpen,
 } from "lucide-react";
 
 const links = [
@@ -42,10 +44,12 @@ const links = [
   { href: "/compliance", label: "Compliance & Audit", icon: Shield },
   { href: "/data", label: "Data Analysis", icon: BarChart },
   { href: "/orchestrator", label: "Orchestrator", icon: Network },
+  { href: "/recipes", label: "Recipes", icon: BookOpen },
   { href: "/content", label: "Content Creator", icon: FileText },
   { href: "/marketplace", label: "Marketplace", icon: Store },
   { href: "/bounties", label: "Bounty Board", icon: Target },
   { href: "/market", label: "Memory Market", icon: Gavel },
+  { href: "/memory", label: "Memory Layer", icon: Database },
   { href: "/badge", label: "ARC Certified", icon: BadgeCheck },
   { href: "/faucet", label: "Faucet", icon: Droplet },
   { href: "/create", label: "New Record", icon: PlusCircle },

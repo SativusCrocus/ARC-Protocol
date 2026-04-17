@@ -298,7 +298,7 @@ def validate(
 
     if record.get("arc") != ARC_VERSION:
         errs.append(f"Bad ARC version: {record.get('arc')}")
-    if record.get("type") not in ("genesis", "action", "settlement"):
+    if record.get("type") not in ("genesis", "action", "settlement", "memory"):
         errs.append(f"Bad type: {record.get('type')}")
     for f in ("agent", "ts", "ihash", "ohash", "action", "sig"):
         if f not in record:
@@ -364,6 +364,7 @@ def build_record(
     ohash: str = None,
     alias: Optional[str] = None,
     settlement: Optional[dict] = None,
+    memory: Optional[dict] = None,
 ) -> dict:
     pub = xonly_pubkey(secret).hex()
     agent = {"pubkey": pub}
@@ -382,6 +383,16 @@ def build_record(
     }
     if settlement:
         record["settlement"] = settlement
+    if memory:
+        # Memory payloads are part of the canonical JSON that gets signed,
+        # so tampering with any field invalidates the signature.
+        record["memory_type"] = memory["memory_type"]
+        record["memory_key"] = memory["memory_key"]
+        record["memory_value"] = memory["memory_value"]
+        if memory.get("ttl") is not None:
+            record["ttl"] = int(memory["ttl"])
+        if memory.get("supersedes"):
+            record["supersedes"] = memory["supersedes"]
     record["sig"] = sign_record(record, secret)
     return record
 

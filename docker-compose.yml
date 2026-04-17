@@ -1,3 +1,10 @@
+# ARC Protocol — base compose for the core stack.
+#
+# For the full ARC Goose distribution (branded build, orchestrator,
+# optional local Ollama profile), use instead:
+#   cd distro/arc-goose && docker compose up -d
+# See distro/arc-goose/docs/QUICKSTART.md for details.
+
 services:
   backend:
     build: ./backend
@@ -19,6 +26,37 @@ services:
       - "3000:3000"
     environment:
       - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  mcp-server:
+    build: ./mcp-server
+    ports:
+      - "8765:8765"
+    environment:
+      - ARC_API_URL=http://backend:8000
+      - ARC_MCP_SSE_HOST=0.0.0.0
+      - ARC_MCP_SSE_PORT=8765
+      - ARC_LOG_LEVEL=INFO
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "8100:8100"
+    environment:
+      - ARC_API_URL=http://backend:8000
+      - ARC_MCP_COMMAND=arc-mcp
+      - ARC_ORCH_HOST=0.0.0.0
+      - ARC_ORCH_PORT=8100
+      # Dry-run by default: the container image does not bundle Goose.
+      # Set ARC_ORCH_DRY_RUN=false once Goose is installed in the image or
+      # mounted from the host, and provide a real provider API key.
+      - ARC_ORCH_DRY_RUN=true
+      - ARC_DEFAULT_PROVIDER=ollama/llama3.2
     depends_on:
       backend:
         condition: service_healthy

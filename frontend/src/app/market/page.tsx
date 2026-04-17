@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Link2,
   ArrowRight,
+  Database,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { findCertifiedByAlias, isCertifiedAlias } from "@/lib/certified";
@@ -96,14 +97,31 @@ export default function MemoryMarketPage() {
           0,
           ...bids.filter((b) => b.record_id === r.id).map((b) => b.amount_sats),
         );
+        // Memory records carry signed, durable knowledge — they get a
+        // base score bump so they're biddable even without inbound links.
+        const isMemory = r.record.type === "memory";
         const score =
           inboundCount * 10 +
           r.record.memrefs.length * 3 +
           (r.record.settlement?.amount_sats || 0) / 1000 +
-          totalBidSats / 250;
-        return { rec: r, inboundCount, bidCount, totalBidSats, topBid, score };
+          totalBidSats / 250 +
+          (isMemory ? 12 : 0);
+        return {
+          rec: r,
+          inboundCount,
+          bidCount,
+          totalBidSats,
+          topBid,
+          score,
+          isMemory,
+        };
       })
-      .filter((x) => x.inboundCount > 0 || x.rec.record.memrefs.length > 0)
+      .filter(
+        (x) =>
+          x.inboundCount > 0 ||
+          x.rec.record.memrefs.length > 0 ||
+          x.isMemory,
+      )
       .sort((a, b) => b.score - a.score)
       .slice(0, 12);
     return annotated;
@@ -310,7 +328,19 @@ export default function MemoryMarketPage() {
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div className="min-w-0">
                               <p className="text-sm font-semibold text-white/90 truncate">
-                                {r.record.action || "(anonymous record)"}
+                                {row.isMemory && r.record.memory_key ? (
+                                  <>
+                                    <span className="font-mono text-[#A855F7]">
+                                      {r.record.memory_key}
+                                    </span>
+                                    <span className="text-white/30 mx-1.5">=</span>
+                                    <span className="text-white/80">
+                                      {r.record.memory_value}
+                                    </span>
+                                  </>
+                                ) : (
+                                  r.record.action || "(anonymous record)"
+                                )}
                               </p>
                               <p className="text-[10px] font-mono text-white/40 truncate">
                                 {r.id}
@@ -324,6 +354,12 @@ export default function MemoryMarketPage() {
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
+                              {row.isMemory && (
+                                <Badge className="font-mono bg-[#A855F7]/10 text-[#A855F7] border-[#A855F7]/30 gap-1">
+                                  <Database className="h-3 w-3" />
+                                  memory · {r.record.memory_type}
+                                </Badge>
+                              )}
                               <Badge className="font-mono bg-white/[0.04] text-white/70 border-white/10 gap-1">
                                 <Network className="h-3 w-3" /> {row.inboundCount} inbound
                               </Badge>

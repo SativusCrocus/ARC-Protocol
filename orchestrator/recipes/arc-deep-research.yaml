@@ -1,0 +1,53 @@
+name: arc-deep-research
+description: |
+  Deep-research workflow — scope the question, gather citations, analyse,
+  synthesise, and inscribe. Every step becomes a signed ARC record;
+  the final report is optionally Lightning-settled.
+
+parameters:
+  - name: topic
+    description: Subject to research
+    required: true
+
+arc:
+  enabled: true
+  agent: arc-deep-research
+  settle_on_complete: true
+  settlement_amount_sats: 500
+  memref_strategy: full_chain
+  inscription: true
+
+steps:
+  - name: scope
+    prompt: |
+      Scope the research question around {topic}. Define the exact claim to
+      verify or the map to explore. Output a concise research plan with 3–5
+      sub-questions.
+    arc:
+      action_label: "Scope phase: {topic}"
+      capture_output_hash: true
+
+  - name: research
+    prompt: |
+      Gather evidence for each sub-question from your plan for {topic}.
+      Prefer primary sources. Cite everything. Resolve contradictions
+      explicitly.
+    arc:
+      action_label: "Research phase: {topic}"
+      memrefs: [scope]
+
+  - name: analyse
+    prompt: |
+      Analyse the research findings. Weigh the evidence; surface what is
+      well-supported vs. contested. Identify open questions.
+    arc:
+      action_label: "Analysis phase"
+      memrefs: [scope, research]
+
+  - name: synthesise
+    prompt: |
+      Produce the final report: Findings / Evidence / Open Questions.
+      Terse, dense, no padding.
+    arc:
+      action_label: "Synthesis + inscription"
+      memrefs: [scope, research, analyse]

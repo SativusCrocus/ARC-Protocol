@@ -1,0 +1,45 @@
+name: arc-code-review
+description: |
+  Provenance-backed code review: scan a repo or diff, analyse for defects,
+  produce a structured report, and Lightning-settle the review work.
+
+parameters:
+  - name: target
+    description: Repo URL, diff, or file path to review
+    required: true
+  - name: focus
+    description: Review focus (security, performance, correctness, style…)
+    required: false
+    default: correctness
+
+arc:
+  enabled: true
+  agent: arc-codegen
+  settle_on_complete: true
+  settlement_amount_sats: 1500
+  memref_strategy: previous_only
+  inscription: false
+
+steps:
+  - name: scan
+    prompt: |
+      Scan {target}. List the files/functions in scope. Flag anything that
+      looks obviously off before deeper analysis. Focus: {focus}.
+    arc:
+      action_label: "Scan: {target}"
+
+  - name: analyse
+    prompt: |
+      Dig into each flagged item from the scan. Classify each finding by
+      severity (critical / major / minor / nit) with a one-line justification.
+    arc:
+      action_label: "Analyse findings"
+      memrefs: [scan]
+
+  - name: report
+    prompt: |
+      Produce the review report: Summary / Findings (by severity) /
+      Recommended fixes / Risk assessment. Terse and actionable.
+    arc:
+      action_label: "Review report"
+      memrefs: [scan, analyse]

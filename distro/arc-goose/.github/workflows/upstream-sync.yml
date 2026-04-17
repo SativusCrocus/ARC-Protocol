@@ -1,0 +1,77 @@
+name: arc-goose upstream sync
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"  # every Monday 13:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve current and latest Goose versions
+        id: versions
+        run: |
+          CURRENT=$(grep -E '^\s*version:' distro/arc-goose/config.yaml | awk '{print $2}' | tr -d '"')
+          LATEST=$(curl -fsSL https://api.github.com/repos/aaif-goose/goose/releases/latest \
+            | python -c "import json,sys; print(json.load(sys.stdin).get('tag_name','')).lstrip('v')" || echo "")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "Current ARC Goose: $CURRENT"
+          echo "Latest upstream Goose: $LATEST"
+
+      - name: Fetch upstream CUSTOM_DISTROS.md
+        if: steps.versions.outputs.latest != ''
+        run: |
+          curl -fsSL \
+            "https://raw.githubusercontent.com/aaif-goose/goose/v${{ steps.versions.outputs.latest }}/CUSTOM_DISTROS.md" \
+            -o /tmp/upstream_custom_distros.md || touch /tmp/upstream_custom_distros.md
+
+      - name: Diff against last-synced snapshot
+        id: diff
+        run: |
+          SNAPSHOT="distro/arc-goose/.upstream/CUSTOM_DISTROS.md"
+          mkdir -p "$(dirname "$SNAPSHOT")"
+          if [[ ! -f "$SNAPSHOT" ]]; then
+            echo "first-sync=true" >> $GITHUB_OUTPUT
+            cp /tmp/upstream_custom_distros.md "$SNAPSHOT" 2>/dev/null || touch "$SNAPSHOT"
+            echo "diff=(initial snapshot)" >> $GITHUB_OUTPUT
+          elif ! diff -q "$SNAPSHOT" /tmp/upstream_custom_distros.md >/dev/null 2>&1; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            diff -u "$SNAPSHOT" /tmp/upstream_custom_distros.md > /tmp/diff.patch || true
+            cp /tmp/upstream_custom_distros.md "$SNAPSHOT"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Open sync PR
+        if: steps.diff.outputs.changed == 'true' || steps.diff.outputs.first-sync == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/distro-upstream-sync-${{ steps.versions.outputs.latest }}
+          title: "chore(distro): sync upstream Goose v${{ steps.versions.outputs.latest }}"
+          commit-message: "chore(distro): sync upstream Goose v${{ steps.versions.outputs.latest }}"
+          body: |
+            Upstream Goose released **v${{ steps.versions.outputs.latest }}**
+            (current ARC Goose pin: v${{ steps.versions.outputs.current }}).
+
+            This PR refreshes the vendored snapshot of `CUSTOM_DISTROS.md`
+            at `distro/arc-goose/.upstream/CUSTOM_DISTROS.md`.
+
+            **Reviewer checklist:**
+            - [ ] Review schema diff (see file changes)
+            - [ ] Update `distro/arc-goose/config.yaml` if required keys changed
+            - [ ] Bump `version:` in `config.yaml` per UPGRADING.md
+            - [ ] Update compatibility matrix in `distro/arc-goose/docs/UPGRADING.md`
+            - [ ] Run `build` workflow locally if needed
+          labels: |
+            distro
+            upstream-sync

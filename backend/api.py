@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 import arc
+import memory as mem
 import marketplace as mkt
 import research_agent as ra
 import codegen_agent as cg
@@ -390,6 +391,167 @@ def inscription(request: Request, record_id: str):
     if not record:
         raise HTTPException(404, "Record not found")
     return {"command": arc.inscription_envelope(record), "record": record}
+
+
+# ── Memory Layer ───────────────────────────────────────────────────────────
+# Cryptographically verifiable cross-session memory for Goose (and any)
+# agents. Writes go through the same Schnorr signing path as every other
+# ARC record — no unsigned memories. See backend/memory.py.
+
+
+class MemoryStoreReq(BaseModel):
+    memory_key: str = Field(..., min_length=1, max_length=256)
+    memory_value: str = Field(..., min_length=1, max_length=mem.MEMORY_VALUE_MAX)
+    memory_type: str = Field("context", max_length=32)
+    alias: Optional[str] = Field(None, max_length=64)
+    ttl: Optional[int] = Field(None, ge=1, le=60 * 60 * 24 * 365 * 10)
+    supersedes: Optional[str] = Field(None, min_length=64, max_length=64)
+
+    @field_validator("supersedes")
+    @classmethod
+    def _hex(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not _HEX64.match(v):
+            raise ValueError("supersedes must be 64-char lowercase hex")
+        return v
+
+
+def _agent_head(db, pubkey: str) -> Optional[str]:
+    """Most recent record ID for an agent — needed as prev for a new write."""
+    rows = arc.fetch_by_pubkey(db, pubkey)
+    return rows[-1][0] if rows else None
+
+
+def _ensure_agent_head(db, key: bytes, alias: Optional[str]) -> str:
+    """Return prev for this agent, creating a genesis if none exists yet."""
+    pub = arc.xonly_pubkey(key).hex()
+    head = _agent_head(db, pub)
+    if head:
+        return head
+    genesis = arc.build_record(
+        "genesis", key, f"Memory agent initialized ({alias or pub[:16]})",
+        alias=alias or "memory",
+    )
+    return _verify_and_store(db, genesis)
+
+
+@app.post("/memory")
+@limiter.limit("60/minute")
+def memory_store(request: Request, req: MemoryStoreReq):
+    """Create a signed, hash-chained memory record."""
+    try:
+        mem.validate_key(req.memory_key)
+        mem.validate_value(req.memory_value)
+        mem.validate_type(req.memory_type)
+    except mem.MemoryError as e:
+        raise HTTPException(400, str(e))
+
+    db = arc.get_db()
+    try:
+        key = arc.load_key()
+    except Exception:
+        arc.generate_keypair(req.alias or "memory")
+        key = arc.load_key()
+    pub = arc.xonly_pubkey(key).hex()
+
+    if req.supersedes:
+        try:
+            mem.validate_supersedes(db, req.supersedes, pub)
+        except mem.MemoryError as e:
+            raise HTTPException(400, str(e))
+
+    prev = _ensure_agent_head(db, key, req.alias)
+    rec = mem.build_memory_record(
+        key,
+        prev=prev,
+        memory_key=req.memory_key,
+        memory_value=req.memory_value,
+        memory_type=req.memory_type,
+        alias=req.alias,
+        ttl=req.ttl,
+        supersedes=req.supersedes,
+    )
+    rid = _verify_and_store(db, rec)
+    return {"id": rid, "record": rec}
+
+
+@app.get("/memory/search")
+@limiter.limit("120/minute")
+def memory_search(
+    request: Request,
+    q: str = "",
+    agent: Optional[str] = None,
+    limit: int = 100,
+):
+    """Search memory records by key prefix/substring."""
+    if agent and not _HEX64.match(agent):
+        raise HTTPException(400, "agent must be 64-char hex pubkey")
+    limit = max(1, min(limit, 500))
+    return {"results": mem.search_memories(arc.get_db(), q, agent=agent, limit=limit)}
+
+
+@app.get("/memory/agent/{pubkey}")
+@limiter.limit("120/minute")
+def memory_agent(request: Request, pubkey: str):
+    if not _HEX64.match(pubkey):
+        raise HTTPException(400, "pubkey must be 64-char hex")
+    return {"agent": pubkey, "results": mem.memories_for_agent(arc.get_db(), pubkey)}
+
+
+@app.get("/memory/latest/{key}")
+@limiter.limit("120/minute")
+def memory_latest(request: Request, key: str):
+    try:
+        mem.validate_key(key)
+    except mem.MemoryError as e:
+        raise HTTPException(400, str(e))
+    result = mem.latest_for_key(arc.get_db(), key)
+    if result is None:
+        raise HTTPException(404, f"no memory for key '{key}'")
+    return result
+
+
+@app.get("/memory/timeline/{key}")
+@limiter.limit("120/minute")
+def memory_timeline(request: Request, key: str):
+    try:
+        mem.validate_key(key)
+    except mem.MemoryError as e:
+        raise HTTPException(400, str(e))
+    return {"key": key, "history": mem.timeline_for_key(arc.get_db(), key)}
+
+
+@app.get("/memory/stats")
+@limiter.limit("60/minute")
+def memory_stats(request: Request):
+    return mem.stats(arc.get_db())
+
+
+@app.delete("/memory/{record_id}")
+@limiter.limit("30/minute")
+def memory_delete(request: Request, record_id: str):
+    """Soft-delete by appending a tombstone record that supersedes this one."""
+    _validate_hex_id(record_id)
+    db = arc.get_db()
+    target = arc.fetch(db, record_id)
+    if not target or target.get("type") != "memory":
+        raise HTTPException(404, "memory record not found")
+    try:
+        key = arc.load_key()
+    except Exception:
+        raise HTTPException(400, "No keys found")
+    pub = arc.xonly_pubkey(key).hex()
+    if target.get("agent", {}).get("pubkey") != pub:
+        raise HTTPException(403, "can only tombstone own memories")
+    prev = _ensure_agent_head(db, key, target.get("agent", {}).get("alias"))
+    rec = mem.build_tombstone_record(
+        key,
+        prev=prev,
+        supersedes_id=record_id,
+        memory_key=target["memory_key"],
+        alias=target.get("agent", {}).get("alias"),
+    )
+    rid = _verify_and_store(db, rec)
+    return {"id": rid, "record": rec, "tombstoned": record_id}
 
 
 # ── Marketplace ────────────────────────────────────────────────────────────

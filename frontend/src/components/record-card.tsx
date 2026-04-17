@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ARCRecord } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Zap } from "lucide-react";
+import { Zap, Database } from "lucide-react";
 
 const typeStyles: Record<string, { badge: string; dot: string }> = {
   genesis: {
@@ -17,6 +17,10 @@ const typeStyles: Record<string, { badge: string; dot: string }> = {
   settlement: {
     badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     dot: "bg-emerald-400",
+  },
+  memory: {
+    badge: "bg-[#A855F7]/10 text-[#A855F7] border-[#A855F7]/20",
+    dot: "bg-[#A855F7]",
   },
 };
 
@@ -35,7 +39,16 @@ export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
             />
           </div>
 
-          <Badge className={style.badge}>{record.type}</Badge>
+          <Badge className={style.badge}>
+            {record.type === "memory" ? (
+              <span className="flex items-center gap-1">
+                <Database className="h-3 w-3" />
+                memory
+              </span>
+            ) : (
+              record.type
+            )}
+          </Badge>
 
           {record.agent.alias && (
             <span className="text-[10px] text-white/40 font-mono shrink-0">
@@ -44,9 +57,19 @@ export function RecordCard({ id, record }: { id: string; record: ARCRecord }) {
           )}
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white/80 truncate group-hover:text-white transition-colors">
-              {record.action}
-            </p>
+            {record.type === "memory" && record.memory_key ? (
+              <p className="text-sm font-medium text-white/80 truncate group-hover:text-white transition-colors">
+                <span className="font-mono text-[#A855F7]">
+                  {record.memory_key}
+                </span>
+                <span className="text-white/30 mx-1.5">=</span>
+                <span className="text-white/70">{record.memory_value}</span>
+              </p>
+            ) : (
+              <p className="text-sm font-medium text-white/80 truncate group-hover:text-white transition-colors">
+                {record.action}
+              </p>
+            )}
             <p className="text-[11px] text-white/20 font-mono mt-0.5">
               {id.slice(0, 24)}&hellip;
             </p>

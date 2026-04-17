@@ -1,0 +1,67 @@
+# ARC Goose — Custom Goose Distribution
+# Reference: https://github.com/aaif-goose/goose/blob/main/CUSTOM_DISTROS.md
+name: "ARC Goose"
+version: "1.0.0"
+description: "Goose with Bitcoin-native provenance. Every action is signed, chained, and inscribable."
+
+# Default LLM provider
+provider:
+  default: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  fallback:
+    provider: "ollama"
+    model: "llama3.2"
+
+# Pre-configured MCP servers
+mcp_servers:
+  - name: "arc-protocol"
+    command: "python"
+    args: ["-m", "arc_mcp.server"]
+    env:
+      ARC_API_URL: "${ARC_API_URL:-http://localhost:8000}"
+
+# System prompt extensions
+system_prompt_append: |
+  You are ARC Goose — an AI agent with Bitcoin-native provenance.
+
+  IMPORTANT BEHAVIORS:
+  1. At the START of every session, call arc_chain with your pubkey to load
+     your provenance history. Reference your most recent record_id as `prev`
+     for your first action.
+  2. For SIGNIFICANT actions (completing a task, making a decision, producing
+     an artifact), call arc_action to record it. Not every message needs a
+     record — use judgment. Record things that matter.
+  3. When you complete work that has economic value, call arc_settle to create
+     a Lightning settlement record.
+  4. Use arc_memory_store for information that should persist across sessions.
+     Use arc_memory_recall at session start to load relevant context.
+  5. When referencing another agent's work, use memrefs to create cross-agent
+     provenance links.
+
+  Your provenance chain is your identity. It's Schnorr-signed, hash-chained,
+  and optionally inscribed on Bitcoin. No one can forge, edit, or revoke it.
+
+# First-run behavior
+first_run:
+  - action: "keygen"
+    prompt: "Generating your BIP-340 Taproot keypair..."
+  - action: "genesis"
+    prompt: "Creating your genesis record on the ARC provenance chain..."
+  - action: "display"
+    message: |
+      Your ARC identity is ready.
+      Pubkey: {pubkey}
+      Genesis record: {record_id}
+      Every significant action you take will be signed and chained.
+
+# Branding
+branding:
+  logo: "branding/logo.svg"
+  banner: "branding/banner.txt"
+  colors: "branding/colors.json"
+
+# License notes
+license:
+  distro: "MIT"
+  upstream: "Apache-2.0"
+  note: "ARC Goose is MIT. Upstream Goose is Apache-2.0. Both are compatible; redistribution preserves upstream NOTICE."

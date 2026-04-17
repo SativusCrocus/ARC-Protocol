@@ -1,0 +1,42 @@
+{
+  "name": "ARC Goose",
+  "description": "Color tokens for terminal and desktop theming.",
+  "palette": {
+    "bitcoin_orange": "#F7931A",
+    "ink": "#0B0B0C",
+    "paper": "#FAFAFA",
+    "accent_amber": "#FFB547",
+    "dim": "#6B7280",
+    "success": "#22C55E",
+    "warning": "#EAB308",
+    "error": "#EF4444",
+    "chain_link": "#8B5CF6"
+  },
+  "terminal": {
+    "background": "#0B0B0C",
+    "foreground": "#FAFAFA",
+    "cursor": "#F7931A",
+    "prompt": "#F7931A",
+    "info": "#8B5CF6",
+    "success": "#22C55E",
+    "error": "#EF4444",
+    "dim": "#6B7280"
+  },
+  "desktop": {
+    "primary": "#F7931A",
+    "primary_hover": "#FFB547",
+    "surface": "#0B0B0C",
+    "surface_alt": "#161618",
+    "text": "#FAFAFA",
+    "text_muted": "#A1A1AA",
+    "border": "#27272A",
+    "accent": "#8B5CF6"
+  },
+  "semantic": {
+    "signed": "#22C55E",
+    "pending": "#EAB308",
+    "inscribed": "#F7931A",
+    "revoked": "#EF4444",
+    "memref": "#8B5CF6"
+  }
+}

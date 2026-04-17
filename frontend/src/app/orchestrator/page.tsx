@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, Suspense, useCallback, useMemo, useEffect } from "react";
+import { useState, Suspense, useCallback, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import {
+  api,
+  gooseApi,
+  type GooseAgent,
+  type GooseActivityEvent,
+  type GooseDispatchResult,
+} from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -252,6 +258,331 @@ function SpawnInscribeButton({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
+// ── Goose Runtime Panel ──────────────────────────────────────────────
+// Talks to the new Goose-powered orchestrator service (separate from the
+// cron-based backend orchestrator below). Every dispatch here produces a
+// real ARC record via the ARC MCP server wired into the Goose session.
+
+function GooseRuntimePanel() {
+  const [task, setTask] = useState("");
+  const [targetAgent, setTargetAgent] = useState<string>("");
+  const [events, setEvents] = useState<GooseActivityEvent[]>([]);
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const healthQuery = useQuery({
+    queryKey: ["goose-health"],
+    queryFn: gooseApi.health,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+
+  const agentsQuery = useQuery({
+    queryKey: ["goose-agents"],
+    queryFn: gooseApi.agents,
+    enabled: !!healthQuery.data?.ok,
+  });
+
+  const dispatchMutation = useMutation({
+    mutationFn: ({ task, agent }: { task: string; agent?: string }) =>
+      gooseApi.dispatch(task, agent || undefined),
+  });
+
+  // Seed events list from REST on first connect so late subscribers aren't blind.
+  useEffect(() => {
+    if (!healthQuery.data?.ok) return;
+    gooseApi
+      .activity(50)
+      .then((list) => setEvents(list))
+      .catch(() => {});
+  }, [healthQuery.data?.ok]);
+
+  // Live WebSocket stream of ActivityEvents.
+  useEffect(() => {
+    if (!healthQuery.data?.ok) return;
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    const url = gooseApi.streamURL();
+    try {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onopen = () => !cancelled && setWsConnected(true);
+      ws.onclose = () => !cancelled && setWsConnected(false);
+      ws.onerror = () => !cancelled && setWsConnected(false);
+      ws.onmessage = (msg) => {
+        try {
+          const ev = JSON.parse(msg.data) as GooseActivityEvent;
+          setEvents((prev) => [...prev.slice(-199), ev]);
+        } catch {
+          // ignore malformed frames
+        }
+      };
+      return () => {
+        cancelled = true;
+        ws.close();
+      };
+    } catch {
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [healthQuery.data?.ok]);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!task.trim() || dispatchMutation.isPending) return;
+      dispatchMutation.mutate({
+        task: task.trim(),
+        agent: targetAgent || undefined,
+      });
+    },
+    [task, targetAgent, dispatchMutation],
+  );
+
+  const health = healthQuery.data;
+  const agents = agentsQuery.data || [];
+  const serviceDown = healthQuery.isError || (!healthQuery.isLoading && !health?.ok);
+
+  return (
+    <Card className="border-[#F97316]/30 bg-[#0a0a0a] orch-card-glow">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <Sparkles className="h-3.5 w-3.5 text-[#F97316]" />
+              <h4 className="text-xs text-white/60 uppercase tracking-wider font-medium">
+                Goose Runtime
+              </h4>
+              <Badge
+                variant="outline"
+                className="text-[8px] text-[#F97316]/80 border-[#F97316]/30 px-1.5 uppercase"
+              >
+                mcp-wired
+              </Badge>
+              {health?.dry_run && (
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-yellow-400/80 border-yellow-400/30 px-1.5 uppercase"
+                >
+                  dry run
+                </Badge>
+              )}
+              {health?.goose_available === false && !health?.dry_run && (
+                <Badge
+                  variant="outline"
+                  className="text-[8px] text-red-400/80 border-red-400/30 px-1.5 uppercase"
+                >
+                  goose missing
+                </Badge>
+              )}
+              <Badge
+                variant="outline"
+                className={`text-[8px] px-1.5 uppercase ${
+                  wsConnected
+                    ? "text-emerald-400/80 border-emerald-400/30"
+                    : "text-white/40 border-white/20"
+                }`}
+              >
+                <span
+                  className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
+                    wsConnected ? "bg-emerald-400 animate-pulse" : "bg-white/30"
+                  }`}
+                />
+                {wsConnected ? "live" : "offline"}
+              </Badge>
+            </div>
+            <p className="text-[11px] text-white/40">
+              Dispatch real tasks to Goose-backed ARC agents. Each run spawns a
+              short-lived session wired into the ARC MCP server; every tool
+              call the agent makes becomes a signed ARC record.
+            </p>
+          </div>
+          <div className="text-[10px] text-white/30 font-mono text-right">
+            <div>{agents.length} agents loaded</div>
+            {health?.arc_api_url && (
+              <div className="truncate max-w-[240px]">arc → {health.arc_api_url}</div>
+            )}
+          </div>
+        </div>
+
+        {serviceDown && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-[11px] text-red-400/80">
+            Goose orchestrator service unreachable. Start it with{" "}
+            <code className="font-mono text-red-300/90">cd orchestrator && arc-orchestrator</code>{" "}
+            or bring up the docker-compose <code>orchestrator</code> service on
+            port 8100.
+          </div>
+        )}
+
+        {/* Dispatch form */}
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <textarea
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+            placeholder="Describe the task... e.g. 'Summarize the last 24h of Lightning HTLC timeout research' or 'Draft a services NDA jurisdiction-neutral'"
+            rows={3}
+            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2.5 text-sm text-white/80 placeholder:text-white/15 focus:outline-none focus:border-[#F97316]/40 focus:ring-1 focus:ring-[#F97316]/20 transition-all resize-none"
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={targetAgent}
+              onChange={(e) => setTargetAgent(e.target.value)}
+              disabled={agents.length === 0}
+              className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white/70 focus:outline-none focus:border-[#F97316]/30 min-w-[220px]"
+            >
+              <option value="">Auto-route via meta-agent</option>
+              {agents.map((a: GooseAgent) => (
+                <option key={a.agent_name} value={a.agent_name}>
+                  {a.display_name} ({a.trigger})
+                </option>
+              ))}
+            </select>
+            <Button
+              type="submit"
+              disabled={!task.trim() || dispatchMutation.isPending || serviceDown}
+              className="bg-[#F97316]/10 border border-[#F97316]/30 text-[#F97316] hover:bg-[#F97316]/20 disabled:opacity-30 orch-btn-glow"
+            >
+              {dispatchMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Dispatching...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-4 w-4 mr-2" />
+                  Dispatch Task
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+
+        {/* Last dispatch result */}
+        {dispatchMutation.data && (
+          <DispatchResultCard result={dispatchMutation.data} />
+        )}
+        {dispatchMutation.isError && (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-[11px] text-red-400/80">
+            {dispatchMutation.error instanceof Error
+              ? dispatchMutation.error.message
+              : "Dispatch failed"}
+          </div>
+        )}
+
+        {/* Agent roster */}
+        {agents.length > 0 && (
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-white/30 mb-2 flex items-center gap-2">
+              <Bot className="h-2.5 w-2.5" /> Loaded agents
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5">
+              {agents.map((a) => (
+                <div
+                  key={a.agent_name}
+                  className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1.5 text-[10px]"
+                  style={{ borderColor: `${a.color}33` }}
+                >
+                  <div
+                    className="font-medium truncate"
+                    style={{ color: a.color }}
+                  >
+                    {a.display_name}
+                  </div>
+                  <div className="text-white/30 font-mono truncate">
+                    {a.trigger}
+                    {a.schedule ? ` · ${a.schedule}` : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Activity stream */}
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-white/30 mb-2 flex items-center gap-2">
+            <Radio className="h-2.5 w-2.5" /> Live activity
+            <Badge
+              variant="outline"
+              className="text-[8px] text-white/40 border-white/10 px-1.5"
+            >
+              {events.length}
+            </Badge>
+          </div>
+          <div className="max-h-[200px] overflow-y-auto space-y-1 font-mono text-[10px]">
+            {events.length === 0 && (
+              <div className="text-white/25 italic">
+                No activity yet — dispatch a task above.
+              </div>
+            )}
+            {events
+              .slice()
+              .reverse()
+              .map((ev, i) => (
+                <div
+                  key={`${ev.ts}-${i}`}
+                  className="flex items-center gap-2 rounded-md border border-white/[0.04] px-2 py-1"
+                >
+                  <span className="text-[#F97316]/80 uppercase tracking-wider shrink-0">
+                    {ev.kind.split(".").slice(-1)[0]}
+                  </span>
+                  <span className="text-white/50 truncate">
+                    {ev.agent || "—"}
+                  </span>
+                  <span className="ml-auto text-white/25 shrink-0">
+                    {new Date(ev.ts * 1000).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DispatchResultCard({ result }: { result: GooseDispatchResult }) {
+  const stdout = (result.goose?.stdout as string) || "";
+  return (
+    <div className="rounded-lg border border-[#F97316]/20 bg-[#F97316]/5 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-[11px] flex-wrap">
+        <Check
+          className={`h-3.5 w-3.5 ${result.ok ? "text-emerald-400" : "text-red-400"}`}
+        />
+        <span className={result.ok ? "text-emerald-400" : "text-red-400"}>
+          {result.ok ? "dispatched" : "failed"}
+        </span>
+        <span className="text-white/50">→</span>
+        <span className="text-[#F97316] font-mono">{result.agent}</span>
+        {result.dry_run && (
+          <Badge
+            variant="outline"
+            className="text-[8px] text-yellow-400/80 border-yellow-400/30 px-1.5 uppercase"
+          >
+            dry run
+          </Badge>
+        )}
+        {result.new_head && (
+          <span className="text-white/40 font-mono ml-auto">
+            head {result.new_head.slice(0, 16)}…
+          </span>
+        )}
+      </div>
+      {result.error && (
+        <div className="text-[10px] text-red-400/80 font-mono">
+          {result.error}
+        </div>
+      )}
+      {stdout && (
+        <pre className="text-[10px] text-white/60 bg-black/30 rounded p-2 max-h-[180px] overflow-y-auto font-mono whitespace-pre-wrap">
+          {stdout.slice(0, 1200)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export default function OrchestratorPage() {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -448,6 +779,9 @@ export default function OrchestratorPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Goose Runtime — new Goose-powered agent dispatcher */}
+      <GooseRuntimePanel />
 
       {/* Orchestration Form */}
       <Card className="border-white/[0.06] bg-[#0a0a0a] orch-card-glow">

@@ -1,0 +1,98 @@
+# ARC Goose — Full-stack distribution compose
+#
+# Brings up the entire ARC Goose distribution:
+#   - backend       (FastAPI)            :8000
+#   - frontend      (Next.js)            :3000
+#   - mcp-server    (arc-mcp SSE)        :8765
+#   - orchestrator  (Goose runtime)      :8100
+#   - ollama        (local LLM, opt-in)  :11434
+#
+# Run from this directory:
+#   docker compose up -d
+#
+# Opt into local LLM:
+#   docker compose --profile local-llm up -d
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    image: arc-goose/backend:${ARC_GOOSE_VERSION:-1.0.0}
+    ports:
+      - "8000:8000"
+    volumes:
+      - arc-data:/root/.arc
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - ARC_DISTRO=arc-goose
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    image: arc-goose/frontend:${ARC_GOOSE_VERSION:-1.0.0}
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - NEXT_PUBLIC_DISTRO=arc-goose
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mcp-server:
+    build:
+      context: ../..
+      dockerfile: mcp-server/Dockerfile
+    image: arc-goose/mcp-server:${ARC_GOOSE_VERSION:-1.0.0}
+    ports:
+      - "8765:8765"
+    environment:
+      - ARC_API_URL=http://backend:8000
+      - ARC_MCP_SSE_HOST=0.0.0.0
+      - ARC_MCP_SSE_PORT=8765
+      - ARC_LOG_LEVEL=INFO
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ../..
+      dockerfile: orchestrator/Dockerfile
+    image: arc-goose/orchestrator:${ARC_GOOSE_VERSION:-1.0.0}
+    ports:
+      - "8100:8100"
+    environment:
+      - ARC_API_URL=http://backend:8000
+      - ARC_MCP_COMMAND=arc-mcp
+      - ARC_ORCH_HOST=0.0.0.0
+      - ARC_ORCH_PORT=8100
+      - ARC_ORCH_DRY_RUN=${ARC_ORCH_DRY_RUN:-true}
+      - ARC_DEFAULT_PROVIDER=${ARC_DEFAULT_PROVIDER:-ollama/llama3.2}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  arc-data:
+  ollama-data:
