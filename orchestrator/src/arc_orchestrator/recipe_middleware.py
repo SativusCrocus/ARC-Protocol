@@ -703,6 +703,11 @@ class RecipeRunner:
 
 
 def default_recipes_dir() -> Path:
+    import os
+
+    env_dir = os.environ.get("ARC_ORCH_RECIPES_DIR")
+    if env_dir:
+        return Path(env_dir)
     return Path(__file__).resolve().parents[2] / "recipes"
 
 

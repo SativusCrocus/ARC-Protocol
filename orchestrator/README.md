@@ -67,6 +67,8 @@ from environment variables at runtime.
 | `ARC_ORCH_HOST` | `0.0.0.0` | Bind host |
 | `ARC_ORCH_CORS` | `*` | Comma-separated CORS origins |
 | `ARC_ORCH_STATE` | `orchestrator/state.json` | Per-agent chain-head state file |
+| `ARC_ORCH_AGENTS_DIR` | `<pkg>/agents` | Override where the registry loads agent YAMLs from (needed when the package is pip-installed non-editable, e.g. in Docker) |
+| `ARC_ORCH_RECIPES_DIR` | `<pkg>/recipes` | Override where the recipe runner loads recipe YAMLs from |
 | `ARC_DEFAULT_PROVIDER` | `ollama/llama3.2` | Fallback provider referenced from YAMLs |
 
 ## Quick start

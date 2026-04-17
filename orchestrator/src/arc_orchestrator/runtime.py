@@ -370,7 +370,8 @@ def build_runtime_from_env(
     mcp_cmd = os.environ.get("ARC_MCP_COMMAND", "arc-mcp")
     timeout = float(os.environ.get("ARC_ORCH_TIMEOUT", "300"))
 
-    default_dir = Path(__file__).resolve().parents[2] / "agents"
+    env_dir = os.environ.get("ARC_ORCH_AGENTS_DIR")
+    default_dir = Path(env_dir) if env_dir else Path(__file__).resolve().parents[2] / "agents"
     default_state = Path(os.environ.get("ARC_ORCH_STATE", str(default_dir.parent / "state.json")))
 
     registry = AgentRegistry(agents_dir or default_dir)

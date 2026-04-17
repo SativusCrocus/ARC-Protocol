@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "/Users/bcode/Downloads/ARC Protocol/backend/.venv/bin/uvicorn",
-      "runtimeArgs": ["api:app", "--host", "0.0.0.0", "--port", "8000"],
+      "runtimeExecutable": "/Users/bcode/Downloads/ARC Protocol/backend/.venv/bin/python3",
+      "runtimeArgs": ["-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000,
       "cwd": "backend"
     },
@@ -23,6 +23,17 @@
       "cwd": "frontend",
       "env": {
         "NEXT_PUBLIC_API_URL": "https://arc-protocol-production.up.railway.app"
+      }
+    },
+    {
+      "name": "orchestrator",
+      "runtimeExecutable": "/Users/bcode/Downloads/ARC Protocol/orchestrator/.venv/bin/python3",
+      "runtimeArgs": ["-m", "uvicorn", "arc_orchestrator.api:app", "--host", "0.0.0.0", "--port", "8100"],
+      "port": 8100,
+      "cwd": "orchestrator",
+      "env": {
+        "ARC_ORCH_DRY_RUN": "true",
+        "ARC_API_URL": "http://localhost:8000"
       }
     }
   ]
