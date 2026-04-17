@@ -15,10 +15,22 @@
   <img src="https://img.shields.io/badge/Bitcoin-BIP--340_Schnorr-F7931A?style=flat-square&logo=bitcoin&logoColor=white" alt="BIP-340"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"/>
   <img src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 15"/>
+  <a href="mcp-server"><img src="https://img.shields.io/badge/MCP-arc--mcp-10B981?style=flat-square" alt="arc-mcp"/></a>
+  <a href="orchestrator"><img src="https://img.shields.io/badge/Orchestrator-Goose--powered-6366F1?style=flat-square" alt="Goose orchestrator"/></a>
   <a href="distro/arc-goose"><img src="https://img.shields.io/badge/ARC_Goose-Distribution-8B5CF6?style=flat-square" alt="ARC Goose Distribution"/></a>
 </p>
 
 ---
+
+## Contents
+
+- [About](#about) · [Why ARC](#why-arc) · [What's new](#whats-new)
+- [Stack at a glance](#stack-at-a-glance) · [Architecture](#architecture)
+- [Quick Start](#quick-start-60-seconds) · [Prerequisites](#prerequisites)
+- [MCP Server](#mcp-server) · [Orchestrator](#orchestrator) · [Agents](#agents) · [Recipes](#recipes--provenance-wrapped-goose-workflows) · [Memory Layer](#memory-layer--verifiable-cross-session-memory-for-goose)
+- [Protocol Spec](#protocol-specification-v10) · [CLI](#cli-reference) · [REST API](#rest-api)
+- [ARC Goose Distribution](#distributions--arc-goose) · [Frontend Routes](#frontend-routes)
+- [Tests](#running-tests) · [Security](#security) · [Deployment](#vercel-deployment) · [Edge Cases](#edge-cases)
 
 ## About
 
@@ -43,28 +55,64 @@ immutability, censorship resistance, and 15-year track record. No L2 token, no V
 API, no "trust us" middleware can replicate this. The protocol is so simple it's
 unobsoletable – like TCP/IP, the value accrues to the network, not the implementation.
 
+## What's new
+
+**v0.3 — Goose-native runtime.** The protocol now runs on four new pillars that land together in this release:
+
+- **`mcp-server/`** — ARC exposed as Model Context Protocol tools (identity, provenance, settlement, memory)
+- **`orchestrator/`** — Goose-powered dispatch runtime; each of the 10 ARC agents is a short-lived Goose session that writes real signed records
+- **`distro/arc-goose/`** — a branded Goose distribution: vanilla Goose + arc-mcp + first-run keygen/genesis, one command to install
+- **Memory Layer** — a new `memory` record type with Schnorr-signed cross-session memory for any MCP-speaking agent
+- **Recipes** — ARC-aware Goose YAML workflows where every step becomes a signed node in a provenance DAG
+
+The legacy cron "spawn every 6 hours" runtime is preserved under [`orchestrator/legacy/`](orchestrator/legacy/) as a fallback.
+
+## Stack at a glance
+
+| Layer | Component | Default port | Language / runtime | Purpose |
+|-------|-----------|--------------|--------------------|---------|
+| UI | [`frontend/`](frontend/) | 3000 | Next.js 15, TypeScript, Tailwind, React Flow | Dashboard, DAG explorer, market, memory, recipes, agents |
+| Core | [`backend/`](backend/) | 8000 | Python 3.11+, FastAPI, SQLite | Keygen, signing, validation, memory, Lightning settlement |
+| Runtime | [`orchestrator/`](orchestrator/) | 8100 | Python 3.11+, FastAPI, APScheduler | Spawns Goose sessions per agent; recipes; WebSocket stream |
+| Bridge | [`mcp-server/`](mcp-server/) | 8765 (SSE) | Python 3.11+, MCP SDK | Exposes ARC as MCP tools over stdio / SSE |
+| Distro | [`distro/arc-goose/`](distro/arc-goose/) | — | Goose + config + install.sh | Branded Goose distribution, one-command install |
+| LLM | Ollama (local) / Anthropic | — | — | Prompt → `ihash`/`ohash`, Goose session provider |
+| Anchor | `ord` / LND | — | — | Optional Bitcoin inscription + Lightning settlement |
+
 ## Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Frontend   │────▶│   Backend    │────▶│   Bitcoin     │
-│  Next.js 15  │     │  FastAPI     │     │  (ord / LND) │
-│  :3000       │     │  :8000       │     │              │
-└──────────────┘     └──────────────┘     └──────────────┘
-                           │
-                     ┌─────┴─────┐
-                     │  Ollama   │
-                     │  (local)  │
-                     └───────────┘
+┌──────────────┐   HTTP    ┌──────────────┐   REST JSON   ┌──────────────┐
+│  Frontend    │──────────▶│  Orchestrator│──────────────▶│   Backend    │
+│  Next.js 15  │◀─ WS ─────│   FastAPI    │◀──────────────│   FastAPI    │
+│  :3000       │           │   :8100      │               │   :8000      │
+└──────┬───────┘           └──────┬───────┘               └──────┬───────┘
+       │                          │                              │
+       │  HTTP                    │  spawns short-lived          │
+       ▼                          ▼  Goose subprocess            ▼
+┌──────────────┐           ┌──────────────┐   stdio       ┌──────────────┐
+│   Backend    │           │    Goose     │──────────────▶│   arc-mcp    │
+│ /records /…  │           │ (session)    │   MCP proto   │   :8765 sse  │
+└──────┬───────┘           └──────┬───────┘               └──────┬───────┘
+       │                          │                              │
+       ▼                          ▼                              │
+ SQLite  ord/LND         Ollama / Anthropic                      │
+ (local) (Bitcoin)                                               │
+       ▲                                                         │
+       └─────────────── HTTP REST ───────────────────────────────┘
 ```
 
-- **Frontend**: Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Framer Motion, React Flow DAG
-- **Backend**: Python CLI (`arc.py`) + FastAPI REST API with slowapi rate limiting
-- **Storage**: SQLite (local dev) → Bitcoin inscriptions (production)
-- **LLM**: Ollama (local, free) for prompt→hash generation
-- **Settlement**: Lightning Network via LND REST API
-- **MCP Server**: `mcp-server/` exposes ARC as [Model Context Protocol](https://modelcontextprotocol.io) tools so [Goose](https://github.com/aaif-goose/goose) and other MCP-compatible agents can call `arc_keygen`, `arc_genesis`, `arc_action`, `arc_validate`, `arc_settle`, `arc_chain`, and `arc_list_records` natively over stdio or SSE
-- **Orchestrator**: `orchestrator/` is the new Goose-powered runtime. Each of the 10 ARC agents is defined by a YAML spec (system prompt + provider + MCP config + trigger) and runs as a short-lived Goose session wired into the ARC MCP server — so every action becomes a genuine signed ARC record instead of a cron-generated placeholder. The original cron orchestrator is preserved as a fallback under `orchestrator/legacy/`.
+Each ARC agent = one YAML in [`orchestrator/agents/`](orchestrator/agents/) + one Goose session at dispatch time. Whatever `arc_*` tool calls that session makes become real, BIP-340 Schnorr-signed records on the chain. No cron placeholders.
+
+**Component details**
+
+- **Frontend** — Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Framer Motion, React Flow DAG
+- **Backend** — Python CLI (`arc.py`) + FastAPI REST API with slowapi rate limiting, strict Pydantic validation, Schnorr re-verification on every write
+- **Storage** — SQLite for local dev (`~/.arc/`); Bitcoin inscriptions via `ord` for production permanence
+- **LLM** — Ollama (local, free) for prompt→hash generation; Anthropic or any Goose-supported provider for the orchestrator
+- **Settlement** — Lightning Network via LND REST API (preimage-revealing settlement records)
+- **MCP Server** — exposes ARC as [Model Context Protocol](https://modelcontextprotocol.io) tools over stdio or SSE: `arc_keygen`, `arc_genesis`, `arc_action`, `arc_validate`, `arc_settle`, `arc_chain`, `arc_list_records`, plus the memory tools `arc_memory_store` / `arc_memory_recall` / `arc_memory_latest`
+- **Orchestrator** — Goose-powered dispatcher; each agent is a YAML spec (system prompt + provider + MCP config + trigger) that runs as a short-lived Goose session wired into arc-mcp. Dry-run mode auto-activates if the Goose CLI is not on `PATH`, so the whole surface works in dev and CI without an LLM.
 
 ### MCP Server
 
@@ -124,15 +172,38 @@ configuration and the agent YAML schema. The cron-based orchestrator it
 replaces is preserved as a fallback in
 [orchestrator/legacy/](orchestrator/legacy/).
 
+## Agents
+
+Ten certified agents ship in [`orchestrator/agents/`](orchestrator/agents/). Each is a YAML spec the runtime loads at startup; spawning one just means executing a Goose session with that agent's prompt, provider, and MCP wiring.
+
+| Agent | Role | Trigger | Frontend |
+|-------|------|---------|----------|
+| `arc-deep-research` | Long-form research + synthesis | on_demand | [`/research`](frontend/src/app/research/) |
+| `arc-code-generator` | Code generation & refactors | on_demand | [`/codegen`](frontend/src/app/codegen/) |
+| `arc-defi-trader` | DeFi / Lightning trading agent | on_demand | [`/trader`](frontend/src/app/trader/) |
+| `arc-legal-contracts` | Contract drafting & review | on_demand | [`/legal`](frontend/src/app/legal/) |
+| `arc-design-images` | Image generation + design | on_demand | [`/design`](frontend/src/app/design/) |
+| `arc-support` | Customer support agent | webhook | [`/support`](frontend/src/app/support/) |
+| `arc-compliance-audit` | Scheduled compliance audits | scheduled | [`/compliance`](frontend/src/app/compliance/) |
+| `arc-data-analysis` | Data cleaning / analysis | on_demand | [`/data`](frontend/src/app/data/) |
+| `arc-content-creator` | Multi-step content pipeline | on_demand | [`/content`](frontend/src/app/content/) |
+| `arc-orchestrator` | **Meta-agent** that routes to others | on_demand | [`/orchestrator`](frontend/src/app/orchestrator/) |
+
+Add a new agent: drop a YAML under `orchestrator/agents/`, restart the runtime, and it appears in `/orchestrator/agents`. The meta-agent automatically considers it for routing if listed in its `child_agents`.
+
 ## Quick Start (60 seconds)
 
-### Option A: Docker (recommended)
+### Option A: Docker — full stack (recommended)
 
 ```bash
 docker-compose up
 ```
 
-Open [http://localhost:3000](http://localhost:3000) (frontend) and [http://localhost:8000/docs](http://localhost:8000/docs) (API docs).
+Brings up frontend, backend, MCP server, and orchestrator. Endpoints:
+
+- [http://localhost:3000](http://localhost:3000) — Frontend dashboard
+- [http://localhost:8000/docs](http://localhost:8000/docs) — Backend Swagger UI
+- [http://localhost:8100/docs](http://localhost:8100/docs) — Orchestrator Swagger UI
 
 ### Option B: Manual (Mac Mini compatible)
 
@@ -147,6 +218,11 @@ uvicorn api:app --reload --port 8000
 cd frontend
 npm install
 npm run dev
+
+# Terminal 3 – Orchestrator (optional, needed for /orchestrator + /recipes)
+cd orchestrator
+pip install -e .
+ARC_ORCH_DRY_RUN=true arc-orchestrator   # omit ARC_ORCH_DRY_RUN once Goose is installed
 ```
 
 ### Option C: CLI only
@@ -158,6 +234,17 @@ python arc.py keygen --alias my-agent
 python arc.py genesis --action "Agent initialized"
 python arc.py view-chain <pubkey>
 ```
+
+### Option D: ARC Goose — the branded Goose distribution
+
+```bash
+cd distro/arc-goose
+./install.sh           # idempotent: keypair + genesis created once
+docker compose up -d
+goose session          # every significant turn is Schnorr-signed
+```
+
+See [`distro/arc-goose/docs/QUICKSTART.md`](distro/arc-goose/docs/QUICKSTART.md) for the full flow.
 
 ## Prerequisites
 
@@ -396,6 +483,24 @@ Docs live in [`distro/arc-goose/docs`](distro/arc-goose/docs):
 **Licensing:** ARC Goose is MIT (matching ARC Protocol). Upstream Goose is Apache-2.0.
 Both are compatible; see [CONTRIBUTING-DISTRO.md](CONTRIBUTING-DISTRO.md) for details.
 
+## Frontend Routes
+
+Every route under `frontend/src/app/` maps to a page in the dashboard. Highlights:
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing + live stack status |
+| `/dashboard-client` | Real-time network dashboard, activity, totals |
+| `/explorer` | Record lookup + chain browser |
+| `/dag` | React Flow DAG visualization |
+| `/market` · `/marketplace` | Memory / work marketplace with bidding |
+| `/memory` | Memory browser — search, timelines, supersedes chains, stats |
+| `/recipes` | ARC-aware Goose recipes — browse, parameterize, launch |
+| `/orchestrator` | Live agent dispatch, activity stream, manual triggers |
+| `/research` · `/codegen` · `/trader` · `/legal` · `/design` · `/support` · `/compliance` · `/data` · `/content` | Per-agent consoles |
+| `/bounties` · `/faucet` · `/badge` · `/create` | Virality + monetization surfaces |
+| `/wallet` · `/settle` | Lightning settlement flows |
+
 ## Running Tests
 
 ```bash
@@ -452,6 +557,18 @@ open https://your-app.vercel.app
 - **Chain gaps**: If a referenced `prev` or `memref` doesn't exist locally, validation reports it as an error.
 - **Duplicate records**: Storing the same record twice produces the same ID (content-addressed).
 - **Timestamp ordering**: The validator enforces monotonically increasing timestamps along the `prev` chain.
+
+## Documentation map
+
+| Topic | Where |
+|-------|-------|
+| Protocol spec & REST API | [This README](#protocol-specification-v10) |
+| MCP server — tools, config, Goose wiring | [`mcp-server/README.md`](mcp-server/README.md) |
+| Memory skill — when Goose should write / update memories | [`mcp-server/goose-memory-skill/SKILL.md`](mcp-server/goose-memory-skill/SKILL.md) |
+| Orchestrator — agent YAMLs, recipes, HTTP/WS surface | [`orchestrator/README.md`](orchestrator/README.md) |
+| ARC Goose distro — install, architecture, upgrades | [`distro/arc-goose/docs/`](distro/arc-goose/docs/) |
+| Distro contributions | [`CONTRIBUTING-DISTRO.md`](CONTRIBUTING-DISTRO.md) |
+| Security policy | [`SECURITY.md`](SECURITY.md) |
 
 ## License
 

@@ -26,9 +26,14 @@ so the same binary can point at a local dev instance or a remote deployment.
 | `arc_settle` | `POST /settle` | Create a Lightning settlement record |
 | `arc_chain` | `GET /chain/{id}` | Retrieve an agent's full provenance chain |
 | `arc_list_records` | `GET /records` | List records, optionally filtered by agent or type |
+| `arc_memory_store` | `POST /memory` | Store a signed, chained memory record (fact / decision / preference / context / learning) |
+| `arc_memory_recall` | `GET /memory/search` | Search past memories by key pattern or namespace prefix |
+| `arc_memory_latest` | `GET /memory/latest/{key}` | Resolve the current value for a key, walking the `supersedes` chain |
 
 Every tool has a Pydantic input schema and a rich description so the LLM
-knows when and why to call it.
+knows when and why to call it. The memory tools pair with the Goose skill
+in [`goose-memory-skill/SKILL.md`](goose-memory-skill/SKILL.md), which
+teaches Goose when to write, update, and skip memories.
 
 ## Install
 
